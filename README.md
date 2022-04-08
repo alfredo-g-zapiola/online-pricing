@@ -30,6 +30,6 @@
        3. with proba lambda * p taken from matrix go to second secondary product, decide if buy
        4. From the previous steps, store all data (if clicked or not, quanityt bought)
 
-**Important note**: from step 3 to 6, the changes are only on the members, but the functionality of the class is the same.
+**Important note**:     from step 3 to 6, the changes are only on the members, but the functionality of the class is the same.
 For example, the demand curves on step 7 have to change over time. But we just need to add a helper function to update those members and we're done!
 
