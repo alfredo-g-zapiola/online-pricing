@@ -1,13 +1,14 @@
 [tool.poetry]
 name = "online-pricing"
 version = "0.1.0"
-description = "Online Learning Applications final project"
-authors = ["Filippo Manzardo <filippommanzardo@gmail.com>", "..."]
+description = "Online Learning Application project source code."
+authors = ["Filippo Manzardo <filippommanzardo@gmail.com> | <add your email here>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 
 [tool.poetry.dev-dependencies]
+pytest = "^7.1.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
