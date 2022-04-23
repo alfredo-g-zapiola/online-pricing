@@ -84,3 +84,9 @@ to generate your virtual environment.
 **Important note**:     from step 3 to 6, the changes are only on the members, but the functionality of the class is the same.
 For example, the demand curves on step 7 have to change over time. But we just need to add a helper function to update those members and we're done!
 
+### The list of random variables
+- Number of items user will buy
+- alpha ratios (dirichlet)
+- Conversion probability with every price (demand curve)
+- Demand curve
+- graph probabilities (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.wishart.html)
