@@ -1,2 +1,3 @@
-class Social_Influce:
+class Social_Influence:
+    #fqiohjo
     pass
