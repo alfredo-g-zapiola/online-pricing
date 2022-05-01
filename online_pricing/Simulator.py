@@ -1,5 +1,5 @@
 import numpy as np
-
+from Social_Influence import *
 
 class Simulator(object):
     def __init__(self, seed=41703192):
@@ -108,6 +108,11 @@ class Simulator(object):
         pass
 
     def sim_one_day(self):
+        #invocazione class social influence per avere i customer iniziali
+        current_customer = current_customer + np.random.binomial(1, 0.1, size=1)
+        # operazioni modifica initial prob matrix
+        history=simulate_episode(init_prob_matrix, n_steps_max)
+
         pass
 
     def sim_one_user(self):
