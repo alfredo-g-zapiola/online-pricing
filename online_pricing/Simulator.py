@@ -1,14 +1,11 @@
 import numpy as np
-
+#from scipy.stats import wishart
 
 class Simulator(object):
     def __init__(self, seed=41703192):
-        # we set a maximum total population so we can have a fixed influence graph
-        # for the number of daily potential
-        self.__population_max = 200
         self.seed = seed
         self.n_groups = 3
-        # TODO big dictionaries here, move it to a json file
+        # TODO big dictionaries here, move it to a json file?
         self.__prices_and_margins = {
             "product_1": {
                 25: 2,
@@ -101,6 +98,8 @@ class Simulator(object):
         # higher beta, higher ...
         self.__beta_demand = 0
 
+        # lambda to go to second secondary product
+        self.__lambda = 0.5
         # initialise R session
         self.__init_R()
 
@@ -132,6 +131,8 @@ class Simulator(object):
         influenced_clients = [[]]  # TODO social influence send and start here
         for client, site, g in influenced_clients:
             self.sim_one_user(group=g, client=client, first_product=site)
+        # Filippo & Flavio TODO send feedback to Learner
+        # Filippo & Flavio  TODO make learner set prices for tomorrow
 
     def sim_one_user(self, group, client, first_product):
         """
@@ -139,18 +140,33 @@ class Simulator(object):
         :param client:
         :return:
         """
-        willing_price = self.__sample_demand_curve(group, prod_id=first_product)
-        if self.__prices_and_margins["product_{}".format(first_product)] > willing_price:
-            print("Client not buying anything")
+        def sim_buy(group, prod_id):
+            willing_price = self.__sample_demand_curve(group, prod_id=prod_id)
+            bought = False
+            if self.__prices_and_margins["product_{}".format(first_product)] > willing_price:
+                # TODO update dictionary
+                bought = False
+            else:
+                # TODO
+                bought = True
+            return bought
+
+        bought_first = sim_buy(group, first_product)
+        if bought_first:
+            first_secondary = None  # TODO sample first secondary
+            goes_to_first_second = True  # TODO flip coin and compare with probability of affinity
+            if goes_to_first_second:
+                bought_second = sim_buy(group, first_secondary)
+                goes_to_second_second = self.__lambda * 0 # TODO sample
+                second_secondary = 3  # TODO sample
+                if goes_to_second_second:
+                    bought_third = sim_buy(group, second_secondary)
+                else:
+                    print("Bought the first product, the first secondary but not the second secondary")
+            else:
+                print("Bought the first product but did not go to the first secondary")
         else:
-            print("Price is OK for client")
-            # quantity bought
-            # GOTO secondary product
-            goes_to_scnd, scnd_id = self.__sample_affinity(prod_id=first_product, group=group, first=True)
-            if  goes_to_scnd:
-                if self.__sample_demand_curve(group=group)
-
-
+            print("Did not buy the first product")
 
         self.__users_data["client_" + str(client)] = {
             "group": group,
