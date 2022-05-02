@@ -1,5 +1,5 @@
 import numpy as np
-from Social_Influence import *
+
 
 class Simulator(object):
     def __init__(self, seed=41703192):
@@ -46,9 +46,9 @@ class Simulator(object):
         # function parameters (can also be opened with a json)
         self.__distributions_parameters = {
             "n_people_params": {
-                "group_0": None,
-                "group_1": None,
-                "group_2": None
+                "group_0": 50,
+                "group_1": 20,
+                "group_2": 70
             },
             "dirichlet_params": {  # TODO dobbiamo giustificare le scelte qui
                 "group 0": (7.65579946, 10.28353546,  5.16981654,  9.36425095,  9.26960117),
@@ -104,19 +104,70 @@ class Simulator(object):
         # initialise R session
         self.__init_R()
 
+        # daily data
+        self.__daily_data = dict()
+        self.__users_data = dict()
+
     def __init_R(self):
         pass
 
     def sim_one_day(self):
-        #invocazione class social influence per avere i customer iniziali
-        current_customer = current_customer + np.random.binomial(1, 0.1, size=1)
-        # operazioni modifica initial prob matrix
-        history=simulate_episode(init_prob_matrix, n_steps_max)
+        # how many new users of each group arriving today
+        ng1, ng2, ng3 = self.__sample_n_users()
+        # total potential clients today
+        n_tot = ng1 + ng2 + ng3
+        # TODO social influence build matrix HERE
+        daily_clients = {
+            "group_1": np.random.choice(range(ng1), size=np.random.uniform(0, ng1)),  # TODO not uniform
+            "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
+            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3))
+        }
+        # TODO: social influence send seeds? HERE
+        self.__users_data = dict()
+        for g in range(3):  # for each group
+            for client, site in daily_clients["group_" + str(g)]:  # for each webpage
+                self.sim_one_user(group=g, client=client, first_product=site)
+        # We now see how these customers have influenced their contacts and simulate what happens to those
+        # they brought to our product websites
+        influenced_clients = [[]]  # TODO social influence send and start here
+        for client, site, g in influenced_clients:
+            self.sim_one_user(group=g, client=client, first_product=site)
 
-        pass
+    def sim_one_user(self, group, client, first_product):
+        """
+        :param group:
+        :param client:
+        :return:
+        """
+        willing_price = self.__sample_demand_curve(group, prod_id=first_product)
+        if self.__prices_and_margins["product_{}".format(first_product)] > willing_price:
+            print("Client not buying anything")
+        else:
+            print("Price is OK for client")
+            # quantity bought
+            # GOTO secondary product
+            goes_to_scnd, scnd_id = self.__sample_affinity(prod_id=first_product, group=group, first=True)
+            if  goes_to_scnd:
+                if self.__sample_demand_curve(group=group)
 
-    def sim_one_user(self):
-        pass
 
-    def __sample_demand_curve(self, group):
-        pass
+
+        self.__users_data["client_" + str(client)] = {
+            "group": group,
+            "quantity_first": None,
+            "quantity_second": None,
+        }
+
+    def __sample_demand_curve(self, group, prod_id):
+        pass  # TODO
+
+    def __sample_n_users(self):
+        """
+
+        :return:
+        """
+        return [np.random.poisson(self.__distributions_parameters["n_people_params"]["group_"+str(i)], 1)
+                for i in range(3)]
+
+    def __sample_affinity(self, prod_id, group, first=True):
+        return np.random.uniform(0, 1)
