@@ -132,9 +132,9 @@ class Simulator(object):
                 self.sim_one_user(group=g, client=client, first_product=site)
         # We now see how these customers have influenced their contacts and simulate what happens to those
         # they brought to our product websites
-        influenced_clients = self.__SocialInfluence.simulate_influence(self.__users_data)
+        influenced_clients_prods = self.__SocialInfluence.simulate_influence(self.__users_data)
 
-        for client, site, g in influenced_clients:
+        for client, product in influenced_clients_prods:
             self.sim_one_user(group=g, client=client, first_product=site)
         # Filippo & Flavio TODO send feedback to Learner
         # Filippo & Flavio  TODO make learner set prices for tomorrow

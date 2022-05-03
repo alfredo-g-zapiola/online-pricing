@@ -15,7 +15,13 @@ class Social_Influence:
 
 
 
-  def simulate_episode(init_prob_matrix, n_steps_max):
+  def simulate_episode(self, init_prob_matrix, n_steps_max):
+    """
+    Cosa si fa in questa funzine
+    :param init_prob_matrix:
+    :param n_steps_max:
+    :return:
+    """
   #simulazione active graph influenza con n step di influenza
     prob_matrix = init_prob_matrix.copy()
     current_customers = prob_matrix.shape[0]
@@ -53,35 +59,35 @@ class Social_Influence:
     return history #registra active graph
 
 
-def simulate_influence(init_data):
-  # init data e' viene come [array_client, array_quale_prodtto, ary_rating]
-  # if rating is 5, add 20% to the random influence (in probability matrix)
-  # if rating is 4, add 10%
-  # if rating is 3, just the random one
-  # if rating is 2 or 1, the initial client is no longer a seed
-  newly_active_customers = [0, 1]
-  products = [4, 5]
-  return [newly_active_customers, products]
+  def simulate_influence(self, init_data):
+    # init data e' viene come [array_client, array_quale_prodtto, ary_rating]
+    # if rating is 5, add 20% to the random influence (in probability matrix)
+    # if rating is 4, add 10%
+    # if rating is 3, just the random one
+    # if rating is 2 or 1, the initial client is no longer a seed
+    newly_active_customers = [0, 1]
+    products = [4, 5]
+    return [newly_active_customers, products]
 
-def estimate_probabilities(dataset, node_index, n_nodes):
-  #dataset = collezione delle history
-  estimated_prob = np.ones(n_nodes) * 1.0 / (n_nodes - 1)
-  credits = np.zeros(n_nodes)
-  occurr_v_active = np.zeros(n_nodes)
-  n_episodes = len(dataset) #numero di grafi simulati
-  for episode in dataset:
-    idx_w_active = np.argwhere(episode[:, node_index] == 1).reshape(-1)
-    if len(idx_w_active) > 0 and idx_w_active > 0:
-      active_nodes_in_prev_step = episode[idx_w_active - 1, :].reshape(-1)
-      credits += active_nodes_in_prev_step / np.sum(active_nodes_in_prev_step)
-    for v in range(0, n_nodes):
-      if v != node_index:
-        idx_v_active = np.argwhere(episode[:, v] == 1).reshape(-1)
-        if len(idx_v_active) > 0 and (idx_v_active < idx_w_active or len(idx_w_active) == 0):
-          occurr_v_active[v] += 1
-  estimated_prob = credits / occurr_v_active
-  estimated_prob = np.nan_to_num(estimated_prob)
-  return estimated_prob
+  def estimate_probabilities(self, dataset, node_index, n_nodes):
+    #dataset = collezione delle history
+    estimated_prob = np.ones(n_nodes) * 1.0 / (n_nodes - 1)
+    credits = np.zeros(n_nodes)
+    occurr_v_active = np.zeros(n_nodes)
+    n_episodes = len(dataset) #numero di grafi simulati
+    for episode in dataset:
+      idx_w_active = np.argwhere(episode[:, node_index] == 1).reshape(-1)
+      if len(idx_w_active) > 0 and idx_w_active > 0:
+        active_nodes_in_prev_step = episode[idx_w_active - 1, :].reshape(-1)
+        credits += active_nodes_in_prev_step / np.sum(active_nodes_in_prev_step)
+      for v in range(0, n_nodes):
+        if v != node_index:
+          idx_v_active = np.argwhere(episode[:, v] == 1).reshape(-1)
+          if len(idx_v_active) > 0 and (idx_v_active < idx_w_active or len(idx_w_active) == 0):
+            occurr_v_active[v] += 1
+    estimated_prob = credits / occurr_v_active
+    estimated_prob = np.nan_to_num(estimated_prob)
+    return estimated_prob
 
 
 #n_nodes = 5
