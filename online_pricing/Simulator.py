@@ -132,8 +132,6 @@ class Simulator(object):
                 self.sim_one_user(group=g, client=client, first_product=site)
         # We now see how these customers have influenced their contacts and simulate what happens to those
         # they brought to our product websites
-
-        [array_client, array_quale_prodtto, ary_rating]
         influenced_clients = self.__SocialInfluence.simulate_influence(self.__users_data)
 
         for client, site, g in influenced_clients:
