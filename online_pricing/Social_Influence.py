@@ -1,4 +1,4 @@
-from Simulator import *
+
 #import matplotlib.pyplot as plt
 #from scipy.stats import wishart, chi2
 import numpy as np
@@ -7,7 +7,7 @@ from copy import copy
 class Social_Influence:
 
   def __init__(self,prob_matrix):
-    self.simulator=Simulator(seed=41703192)
+    # self.simulator=Simulator(seed=41703192)
     self.current_customers=0
     self.n_steps_max=10 #da definire in base ai costumers
     self.prob_matrix=prob_matrix
@@ -52,6 +52,16 @@ class Social_Influence:
 
     return history #registra active graph
 
+
+def simulate_influence(init_data):
+  # init data e' viene come [array_client, array_quale_prodtto, ary_rating]
+  # if rating is 5, add 20% to the random influence (in probability matrix)
+  # if rating is 4, add 10%
+  # if rating is 3, just the random one
+  # if rating is 2 or 1, the initial client is no longer a seed
+  newly_active_customers = [0, 1]
+  products = [4, 5]
+  return [newly_active_customers, products]
 
 def estimate_probabilities(dataset, node_index, n_nodes):
   #dataset = collezione delle history

@@ -1,9 +1,12 @@
 import numpy as np
-#from scipy.stats import wishart
+#from scipy.stats import wishar
+from Social_Influence import Social_Influence
 
 class Simulator(object):
     def __init__(self, seed=41703192):
         self.seed = seed
+        self.__SocialInfluence = None
+
         self.n_groups = 3
         # TODO big dictionaries here, move it to a json file?
         self.__prices_and_margins = {
@@ -115,20 +118,24 @@ class Simulator(object):
         ng1, ng2, ng3 = self.__sample_n_users()
         # total potential clients today
         n_tot = ng1 + ng2 + ng3
-        # TODO social influence build matrix HERE
-        daily_clients = {
+        # TODO define well social influence build matrix HERE
+        self.__SocialInfluence = Social_Influence([ng1, ng2, ng3])
+
+        direct_clients = {
             "group_1": np.random.choice(range(ng1), size=np.random.uniform(0, ng1)),  # TODO not uniform
             "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
             "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3))
         }
-        # TODO: social influence send seeds? HERE
         self.__users_data = dict()
         for g in range(3):  # for each group
-            for client, site in daily_clients["group_" + str(g)]:  # for each webpage
+            for client, site in direct_clients["group_" + str(g)]:  # for each webpage
                 self.sim_one_user(group=g, client=client, first_product=site)
         # We now see how these customers have influenced their contacts and simulate what happens to those
         # they brought to our product websites
-        influenced_clients = [[]]  # TODO social influence send and start here
+
+        [array_client, array_quale_prodtto, ary_rating]
+        influenced_clients = self.__SocialInfluence.simulate_influence(self.__users_data)
+
         for client, site, g in influenced_clients:
             self.sim_one_user(group=g, client=client, first_product=site)
         # Filippo & Flavio TODO send feedback to Learner
