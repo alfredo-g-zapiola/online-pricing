@@ -85,8 +85,8 @@ to generate your virtual environment.
 For example, the demand curves on step 7 have to change over time. But we just need to add a helper function to update those members and we're done!
 
 ### The list of random variables
+- Number of daily clients each day
 - Number of items user will buy
 - alpha ratios (dirichlet)
 - Conversion probability with every price (demand curve)
-- Demand curve
 - graph probabilities (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.wishart.html)
