@@ -35,6 +35,7 @@ class Simulator(object):
             "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
             "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3))
         }
+
         self.__users_data = dict()
         for g in range(3):  # for each group
             for client, site in direct_clients["group_" + str(g)]:  # for each webpage
