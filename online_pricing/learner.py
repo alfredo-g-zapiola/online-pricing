@@ -66,7 +66,7 @@ class Ucb(Learner):
                 self.widths[idx] = np.inf
 
 
-class TS_Learner(Learner):
+class TSLearner(Learner):
     def __init__(self, n_arms: int, prices: list[int]):
         super().__init__(n_arms)
         self.beta_parameters = np.ones((n_arms, 2))
