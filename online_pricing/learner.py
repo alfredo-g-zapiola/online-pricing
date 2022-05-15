@@ -28,7 +28,7 @@ class GreedyLearner(Learner):
     """Greedy learner.
 
     Works by pulling the same arm every time.
-    This arm can be changed by the update method, which set the next price in the list.
+    This arm can be changed by the update method, which sets the next price in the list.
     """
 
     def __init__(self, n_arms: int, prices: list[int]):
