@@ -1,5 +1,7 @@
 import numpy as np
-from Social_Influence import Social_Influence
+
+from online_pricing.environment import GreedyEnvironment
+from online_pricing.social_influence import SocialInfluence
 
 
 class Simulator(object):
@@ -10,8 +12,8 @@ class Simulator(object):
             "product_1": 19.99,
             "product_2": 16.7,
             "product_3": 12.15,
-            "product_4": 8.,
-            "product_5": 35.,
+            "product_4": 8.0,
+            "product_5": 35.0,
         }
         # lambda to go to second secondary product
         self.__lambda = 0.5
@@ -28,12 +30,14 @@ class Simulator(object):
         # total potential clients today
         n_tot = ng1 + ng2 + ng3
         # TODO define well social influence build matrix HERE
-        self.__SocialInfluence = Social_Influence([ng1, ng2, ng3])
+        self.__SocialInfluence = SocialInfluence([ng1, ng2, ng3])
 
         direct_clients = {
-            "group_1": np.random.choice(range(ng1), size=np.random.uniform(0, ng1)),  # TODO not uniform
+            "group_1": np.random.choice(
+                range(ng1), size=np.random.uniform(0, ng1)
+            ),  # TODO not uniform
             "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
-            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3))
+            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3)),
         }
 
         self.__users_data = dict()
@@ -55,6 +59,7 @@ class Simulator(object):
         :param client:
         :return:
         """
+
         def sim_buy(group, prod_id):
             willing_price = self.__sample_demand_curve(group, prod_id=prod_id)
             bought = False
@@ -72,12 +77,14 @@ class Simulator(object):
             goes_to_first_second = True  # TODO flip coin and compare with probability of affinity
             if goes_to_first_second:
                 bought_second = sim_buy(group, first_secondary)
-                goes_to_second_second = self.__lambda * 0 # TODO sample
+                goes_to_second_second = self.__lambda * 0  # TODO sample
                 second_secondary = 3  # TODO sample
                 if goes_to_second_second:
                     bought_third = sim_buy(group, second_secondary)
                 else:
-                    print("Bought the first product, the first secondary but not the second secondary")
+                    print(
+                        "Bought the first product, the first secondary but not the second secondary"
+                    )
             else:
                 print("Bought the first product but did not go to the first secondary")
         else:
@@ -88,5 +95,3 @@ class Simulator(object):
             "quantity_first": None,
             "quantity_second": None,
         }
-
-
