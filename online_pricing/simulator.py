@@ -2,19 +2,15 @@ import numpy as np
 
 from online_pricing.environment import GreedyEnvironment
 from online_pricing.social_influence import SocialInfluence
+from online_pricing.environment import EnvironmentBase, GreedyEnvironment
 
 
 class Simulator(object):
-    def __init__(self, seed=41703192):
+    def __init__(self, environment=GreedyEnvironment, seed=41703192):
         self.seed = seed
         self.__SocialInfluence = None
-        self.prices = {
-            "product_1": 19.99,
-            "product_2": 16.7,
-            "product_3": 12.15,
-            "product_4": 8.0,
-            "product_5": 35.0,
-        }
+        self.environment = environment
+        self.prices = [19.99, 16.7, 12.15, 8.0, 35.0]
         # lambda to go to second secondary product
         self.__lambda = 0.5
         # daily data
@@ -25,25 +21,16 @@ class Simulator(object):
         pass
 
     def sim_one_day(self):
-        # how many new users of each group arriving today
-        ng1, ng2, ng3 = self.__sample_n_users()
-        # total potential clients today
-        n_tot = ng1 + ng2 + ng3
         # TODO define well social influence build matrix HERE
-        self.__SocialInfluence = SocialInfluence([ng1, ng2, ng3])
-
-        direct_clients = {
-            "group_1": np.random.choice(
-                range(ng1), size=np.random.uniform(0, ng1)
-            ),  # TODO not uniform
-            "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
-            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3)),
-        }
+        self.__SocialInfluence = SocialInfluence(self.environment.sample_n_users())
+        direct_clients = self.environment.get_direct_clients()
 
         self.__users_data = dict()
+
         for g in range(3):  # for each group
             for client, site in direct_clients["group_" + str(g)]:  # for each webpage
                 self.sim_one_user(group=g, client=client, first_product=site)
+
         # We now see how these customers have influenced their contacts and simulate what happens to those
         # they brought to our product websites
         influenced_clients_prods = self.__SocialInfluence.simulate_influence(self.__users_data)
@@ -61,13 +48,20 @@ class Simulator(object):
         """
 
         def sim_buy(group, prod_id):
-            willing_price = self.__sample_demand_curve(group, prod_id=prod_id)
+            willing_price = self.environment.sample_demand_curve(group=group, prod_id=prod_id)
             bought = False
-            if self.__prices_and_margins["product_{}".format(first_product)] > willing_price:
-                # TODO update dictionary
+            if self.environment.prices_and_margins["product_{}".format(first_product)] > willing_price:
+                qty = self.environment.sample_quantity_bought(group)
+                # send data to learner
+                self.environment.Learners[prod_id].update(self.prices[prod_id],
+                                                          qty *
+                                                          self.environment.prices_and_margins["product_" +
+                                                                                              str(prod_id)])
                 bought = False
             else:
-                # TODO
+                # send data to learner
+                self.environment.Learners[prod_id].update(self.prices[prod_id], 0)  # 0 since we did not sell
+
                 bought = True
             return bought
 
@@ -95,3 +89,6 @@ class Simulator(object):
             "quantity_first": None,
             "quantity_second": None,
         }
+
+    def send_data_to_learner(self):
+        pass

@@ -5,10 +5,14 @@ import rpy2
 import rpy2.robjects as robjects
 
 
+from online_pricing.learner import GreedyLearner
+
+
 class EnvironmentBase:
     def __init__(self):
+        self.__n_products = 5
         self.n_groups = 3
-        self.__prices_and_margins = {
+        self.prices_and_margins = {
             "product_1": {25: 2, 12: 4, 14: 5, 15: 2},  # TODO look at plot
             "product_2": {25: 2, 12: 4, 14: 5, 15: 2},
             "product_3": {25: 2, 12: 4, 14: 5, 15: 2},
@@ -59,6 +63,9 @@ class EnvironmentBase:
         # initialise R session
         self.__init_R()
 
+        # have the number of users
+        self.__n_users = None
+
     def __init_R(self):
         """
         start R and download the roahd package
@@ -81,19 +88,59 @@ class EnvironmentBase:
 
         :return: a list with the number of potential clients of each group
         """
-        return [
+        self.__n_users = [
             np.random.poisson(
                 self.__distributions_parameters["n_people_params"]["group_" + str(i)], 1
             )
             for i in range(3)
         ]
+        return self.__n_users
 
     def sample_affinity(self, prod_id, group, first=True):
         return np.random.uniform(0, 1)
 
+    def sample_demand_curve(self, group, prod_id):
+        """
+
+        :param group:
+        :param prod_id:
+        :return: a price the client is willing to pay
+        """
+        return 0
+
+    def get_direct_clients(self):
+        """
+
+        :return:
+        z
+        """
+        ng1, ng2, ng3 = self.__n_users
+        direct_clients = {
+            "group_1": np.random.choice(
+                range(ng1), size=np.random.uniform(0, ng1)
+            ),  # TODO not uniform
+            "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
+            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3)),
+        }
+        return direct_clients
+
+    def sample_quantity_bought(self, group):
+        """
+
+        :param group:
+        :return:
+        """
+        return self.__distributions_parameters["quantity_demanded_params"]["group " + str(group)]
+
 
 class GreedyEnvironment(EnvironmentBase):
-    pass
+    prices_and_margins = None
+
+    def __init__(self):
+        super(GreedyEnvironment, self).__init__()
+        # create the list of learners, one for each product
+        self.Learners = [GreedyLearner(n_arms=4, prices=self.prices_and_margins["product_" + str(i)])
+                           for i in range(self.__n_products)]
 
 
 class EnvironmentStep4(EnvironmentBase):
