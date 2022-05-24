@@ -42,14 +42,6 @@ class Simulator(object):
         # Filippo & Flavio TODO send feedback to Learner
         # Filippo & Flavio  TODO make learner set prices for tomorrow
 
-    def sim_buy(self, group, prod_id) -> int:
-        willing_price = self.environment.sample_demand_curve(group=group, prod_id=prod_id)
-        n_units = 0
-        if self.environment.prices_and_margins[f"product_{prod_id}"] > willing_price:
-            n_units = self.environment.sample_quantity_bought(group)
-
-        return n_units
-
     def sim_one_day_greedy(self, first_iteration: bool, max_cumulative_expected_margin: int):
         # TODO define well social influence build matrix HERE
         self.__SocialInfluence = SocialInfluence(self.environment.sample_n_users())
@@ -86,32 +78,13 @@ class Simulator(object):
 
         return change, best_configuration, max_cumulative_expected_margin
 
-    def sim_one_user(self, group, client, first_product):
-        """
-        :param group:
-        :param client:
-        :return:
-        """
+    def sim_buy(self, group, prod_id) -> int:
+        willing_price = self.environment.sample_demand_curve(group=group, prod_id=prod_id)
+        n_units = 0
+        if self.environment.prices_and_margins[f"product_{prod_id}"] > willing_price:
+            n_units = self.environment.sample_quantity_bought(group)
 
-        def sim_buy(group, prod_id):
-            willing_price = self.environment.sample_demand_curve(group=group, prod_id=prod_id)
-            bought = False
-            if (
-                self.environment.prices_and_margins["product_{}".format(first_product)]
-                > willing_price
-            ):
-                qty = self.environment.sample_quantity_bought(group)
-                # send data to learner
-                self.environment.Learners[prod_id].update(
-                    self.prices[prod_id],
-                    qty * self.environment.prices_and_margins["product_" + str(prod_id)],
-                )
-                bought = False
-            else:
-                # send data to learner
-                self.environment.Learners[prod_id].update(
-                    self.prices[prod_id], 0
-                )  # 0 since we did not sell
+        return n_units
 
     def sim_one_user(
         self, group: str, client: str, product: int, product_graph: Any
