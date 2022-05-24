@@ -110,13 +110,12 @@ class Simulator(object):
     def send_data_to_learner(self):
         pass
 
-    def greedy_simulation(self):
+    def greedy_simulation(self, n_iterations: int = 365):
         greedy_environment = GreedyEnvironment
         simulator = Simulator(greedy_environment)
         max_cumulative_expected_margin = 0
-        T = 365
 
-        for t in range(T):
+        for t in range(n_iterations):
             if t == 0:  # first iteration just compute the margin of configuration [0,0,0,0,0]
                 change, best_conf, max_cumulative_expected_margin = simulator.sim_one_day_greedy(
                     True, 0
