@@ -134,13 +134,37 @@ class EnvironmentBase:
 
 
 class GreedyEnvironment(EnvironmentBase):
+    configurations = None
+    Learners = None
     prices_and_margins = None
 
     def __init__(self):
         super(GreedyEnvironment, self).__init__()
         # create the list of learners, one for each product
         self.Learners = [GreedyLearner(n_arms=4, prices=self.prices_and_margins["product_" + str(i)])
-                           for i in range(self.__n_products)]
+                           for i in range(self.__n_products)]       #first configuration [0, 0, 0, 0, 0]
+        self.configurations = []
+
+    def round(self, conf: list[GreedyLearner]):             #given the current configuration, compute the 5 new configurations with greedy policy
+        for i in range(5):
+            for j in range(5):
+                configuration = []
+                n = conf[j].current_price
+                greedy_learner = GreedyLearner(4, self.prices_and_margins["product_" + str(j)])
+                if i == j:
+                    if n < 3:
+                        n += 1
+                        greedy_learner.set_current_price(n)
+                    else:
+                        greedy_learner.set_current_price(n)
+                else:
+                    greedy_learner.set_current_price(n)
+
+                configuration.append(greedy_learner)
+
+            self.configurations.append(configuration)      #list of the 5 computed configurations
+        return self.configurations
+
 
 
 class EnvironmentStep4(EnvironmentBase):

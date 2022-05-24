@@ -39,7 +39,10 @@ class GreedyLearner(Learner):
     def act(self):
         return self.prices[self.current_price]
 
-    def update(self, arm_pulled: int, reward: int):
+    def set_current_price(self, price):
+        self.current_price = price
+
+    def update(self, arm_pulled: int, reward: int):         #i don't think this method is useful
         super().update(arm_pulled, reward)
         self.current_price += 1 if self.current_price < (self.n_arms - 1) else 0
 
