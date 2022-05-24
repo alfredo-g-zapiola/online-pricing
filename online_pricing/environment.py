@@ -8,7 +8,7 @@ from online_pricing.learner import GreedyLearner
 
 
 class EnvironmentBase:
-    def __init__(self):
+    def __init__(self) -> None:
         self.__n_products = 5
         self.n_groups = 3
         self.prices_and_margins = {
@@ -29,6 +29,15 @@ class EnvironmentBase:
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": {"group 0": {}, "group 1": {}, "group 3": {}},
             # product graph probabilities
+            "product_graph": np.array(
+                [
+                    [0.0, 0.1, 0.2, 0.2, 0.0],
+                    [0.1, 0.0, 0.2, 0.3, 0.0],
+                    [0.2, 0.2, 0.0, 0.1, 0.0],
+                    [0.2, 0.3, 0.1, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 0.0, 0.0],
+                ]
+            ),
             # A Wishart distribution is assumed for the product graph probabilities
             "product_graph_params": {
                 "group 0": {
@@ -133,40 +142,19 @@ class EnvironmentBase:
 
 
 class GreedyEnvironment(EnvironmentBase):
-    configurations = None
-    Learners = None
-    prices_and_margins = None
-
-    def __init__(self):
-        super(GreedyEnvironment, self).__init__()
+    def __init__(self) -> None:
+        super().__init__()
         # create the list of learners, one for each product
-        self.Learners = [
-            GreedyLearner(n_arms=4, prices=self.prices_and_margins["product_" + str(i)])
+        self.learners = [
+            GreedyLearner(
+                n_arms=4, prices=list(self.prices_and_margins["product_" + str(i)].values())
+            )
             for i in range(self.__n_products)
         ]  # first configuration [0, 0, 0, 0, 0]
-        self.configurations = []
 
-    def round(
-        self, conf: list[GreedyLearner]
-    ):  # given the current configuration, compute the 5 new configurations with greedy policy
-        for i in range(5):
-            for j in range(5):
-                configuration = []
-                n = conf[j].current_price
-                greedy_learner = GreedyLearner(4, self.prices_and_margins["product_" + str(j)])
-                if i == j:
-                    if n < 3:
-                        n += 1
-                        greedy_learner.set_current_price(n)
-                    else:
-                        greedy_learner.set_current_price(n)
-                else:
-                    greedy_learner.set_current_price(n)
+    def round(self, best_update: int, reward: int):
 
-                configuration.append(greedy_learner)
-
-            self.configurations.append(configuration)  # list of the 5 computed configurations
-        return self.configurations
+        self.learners[best_update].update(self.learners[best_update].act(), reward)
 
 
 class EnvironmentStep4(EnvironmentBase):

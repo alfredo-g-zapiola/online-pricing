@@ -44,9 +44,6 @@ class GreedyLearner(Learner):
             self.prices[self.current_price + 1] if self.current_price < (self.n_arms - 1) else None
         )
 
-    def set_current_price(self, price: int) -> None:
-        self.current_price = price
-
     def update(self, arm_pulled: int, reward: int) -> None:  # i don't think this method is useful
         super().update(arm_pulled, reward)
         self.current_price += 1 if self.current_price < (self.n_arms - 1) else 0
