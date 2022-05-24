@@ -81,7 +81,7 @@ class Simulator(object):
     def sim_buy(self, group, prod_id) -> int:
         willing_price = self.environment.sample_demand_curve(group=group, prod_id=prod_id)
         n_units = 0
-        if self.environment.prices_and_margins[f"product_{prod_id}"] > willing_price:
+        if self.environment.prices_and_margins[f"product_{prod_id}"] < willing_price:
             n_units = self.environment.sample_quantity_bought(group)
 
         return n_units
