@@ -4,7 +4,6 @@ import numpy as np
 import rpy2
 import rpy2.robjects as robjects
 
-
 from online_pricing.learner import GreedyLearner
 
 
@@ -141,11 +140,15 @@ class GreedyEnvironment(EnvironmentBase):
     def __init__(self):
         super(GreedyEnvironment, self).__init__()
         # create the list of learners, one for each product
-        self.Learners = [GreedyLearner(n_arms=4, prices=self.prices_and_margins["product_" + str(i)])
-                           for i in range(self.__n_products)]       #first configuration [0, 0, 0, 0, 0]
+        self.Learners = [
+            GreedyLearner(n_arms=4, prices=self.prices_and_margins["product_" + str(i)])
+            for i in range(self.__n_products)
+        ]  # first configuration [0, 0, 0, 0, 0]
         self.configurations = []
 
-    def round(self, conf: list[GreedyLearner]):             #given the current configuration, compute the 5 new configurations with greedy policy
+    def round(
+        self, conf: list[GreedyLearner]
+    ):  # given the current configuration, compute the 5 new configurations with greedy policy
         for i in range(5):
             for j in range(5):
                 configuration = []
@@ -162,9 +165,8 @@ class GreedyEnvironment(EnvironmentBase):
 
                 configuration.append(greedy_learner)
 
-            self.configurations.append(configuration)      #list of the 5 computed configurations
+            self.configurations.append(configuration)  # list of the 5 computed configurations
         return self.configurations
-
 
 
 class EnvironmentStep4(EnvironmentBase):
