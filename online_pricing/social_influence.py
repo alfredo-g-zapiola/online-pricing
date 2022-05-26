@@ -1,24 +1,55 @@
-# import matplotlib.pyplot as plt
-# from scipy.stats import wishart, chi2
 import numpy as np
 
-# from copy import copy
 
 
 class SocialInfluence:
-    def __init__(self, prob_matrix):
-        # self.simulator=Simulator(seed=41703192)
-        self.current_customers = 0
+    def __init__(self, todays_users):
+        # todays_users looks like this: [100 200 150]
+        self.todays_users= todays_users
+
+        # TODO creare qui 3 graphs: 3 init prob matrices created with uniform
+        # cardinalita di ogni graph e' il numero di users
+        self.graphs = [graph1, graph2, graph3]
+        # DONE
         self.n_steps_max = 10  # da definire in base ai costumers
-        self.prob_matrix = prob_matrix
-        self.alpha_ratios = []
+        # Create three graphs accoriding to the customer
 
     # group number array : [ 1 ng1
     #                      2 ng2
     #                      3 ng3 ] only one of the 3 each iteration
 
-    def simulate_influence_graph(self, init_prob_matrix, n_steps_max, initdata, group_number):
+    def simulate_influence(self, init_data):
         """
+        Only public method oltre al constructor
+        :param init_data: list of tuples with (index customer, product, 1 bought 0 did not buy)
+        {
+            "g1":[(41, 2, 0), (120, 1, 1)],
+            "g2": [(150, 5, 1)],
+            "g3!
+        :return:
+        """
+
+        for g in range(3):  # per ogni gruppo
+            init_data_g = init_data["g" + str(g + 1)]
+            for p in range(5):  # per ogni prodotto
+                pass
+        # . Make the matrices unbalanced taking experience of clients of this group for this product
+        # apply estimated prob
+        # monte carlo
+        # save for every user in this group, the influence to buy this product
+
+        # finiscono i loop
+        # fra quelli che non si trovavano in init_data:
+        # si sceglie come prodotto la prob influence massima, con il numero di prodotto
+
+        # costruire newly_active customers:
+        # [(index cliente, prodotto, probabilita')]
+        newly_active_customers = [(19, 3, .7), (76, 5, .1)]
+        return newly_active_customers
+
+    def __simulate_influence_graph(self, init_prob_matrix, n_steps_max, initdata, group_number):
+        """
+        NB __ lo rende privato
         Cosa si fa in questa funzine
         :param init_prob_matrix:
         :param n_steps_max:
@@ -27,6 +58,7 @@ class SocialInfluence:
         # simulazione active graph influenza con n step di influenza
         prob_matrix = init_prob_matrix.copy()
         current_customers = prob_matrix.shape[0]
+        # initial active customers li fornisce alfredo
         initial_active_customers = np.random.binomial(1, 0.1, size=current_customers)
         history = np.array([initial_active_customers])
         active_customers = initial_active_customers
@@ -68,7 +100,7 @@ class SocialInfluence:
         # serve dictionary che  contenga i 3 graph
         return struc  # registra active graph
 
-    def probability_matrix_unbalanced(
+    def __probability_matrix_unbalanced(
         self, init_prob_matrix, initdata, group_number, number_clients
     ):
         # cliente non  compra bassa probo
@@ -97,13 +129,7 @@ class SocialInfluence:
                     # implementare controllo probo !=1;
         return unbalanced_prob_matrix
 
-    def simulate_influence(self, init_data):
-
-        newly_active_customers = [0, 1]
-        products = [4, 5]
-        return [newly_active_customers, products]
-
-    def estimate_probabilities(self, dataset, node_index, n_nodes):
+    def __estimate_probabilities(self, dataset, node_index, n_nodes):
         # dataset = collezione delle history
         estimated_prob = np.ones(n_nodes) * 1.0 / (n_nodes - 1)
         credits = np.zeros(n_nodes)

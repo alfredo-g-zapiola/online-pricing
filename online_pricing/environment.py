@@ -1,5 +1,5 @@
 import numpy as np
-
+from abc import abstractmethod
 # from scipy.stats import wishart
 import rpy2
 import rpy2.robjects as robjects
@@ -116,6 +116,7 @@ class EnvironmentBase:
         """
         return 0
 
+    @abstractmethod
     def get_direct_clients(self):
         """
 
@@ -125,7 +126,7 @@ class EnvironmentBase:
         ng1, ng2, ng3 = self.__n_users
         direct_clients = {
             "group_1": np.random.choice(
-                range(ng1), size=np.random.uniform(0, ng1)
+                range(ng1), size=np.random.uniform(0, ng1) [5, 70, 95]
             ),  # TODO not uniform
             "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
             "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3)),

@@ -26,7 +26,6 @@ class Simulator(object):
         # TODO define well social influence build matrix HERE
         self.__SocialInfluence = SocialInfluence(self.environment.sample_n_users())
         direct_clients = self.environment.get_direct_clients()
-
         self.__users_data = dict()
 
         for g in range(3):  # for each group
@@ -35,6 +34,14 @@ class Simulator(object):
 
         # We now see how these customers have influenced their contacts and simulate what happens to those
         # they brought to our product websites
+        """
+        mandare dati cosi: index cliente, prodotto, 1 ha preso 0 non ha preso niente
+                [
+            (56, 5, 1),
+            (105, 4, 0)
+        ]
+        
+        """
         influenced_clients_prods = self.__SocialInfluence.simulate_influence(self.__users_data)
 
         for client, product in influenced_clients_prods:
