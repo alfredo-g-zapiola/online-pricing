@@ -14,3 +14,6 @@ where:
 - m_p(x_p) is the margin for product p given the its price x_p
 - i_pptilde is the influence probability given the first visited webpage was p for product ptilde, which depends on x_p
 
+###### useful [link] for the render of the equation
+
+[link]: https://latex.codecogs.com/
