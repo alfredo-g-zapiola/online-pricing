@@ -1,7 +1,6 @@
 import numpy as np
 
 
-
 class SocialInfluence:
     def __init__(self, todays_users):
         # todays_users looks like this: [100 200 150]
@@ -151,7 +150,7 @@ class SocialInfluence:
         estimated_prob = np.nan_to_num(estimated_prob)
         return estimated_prob
 
-    def simulate_influence_history(self, n_steps_max, direct_clients, group_number, initdata):
+    def __simulate_influence_history(self, n_steps_max, direct_clients, group_number, initdata):
         """
         function to simulate the influence succession without considering the direct influence-graph
         in order to proper visualize the number of new clients after a number of influence iteration.
