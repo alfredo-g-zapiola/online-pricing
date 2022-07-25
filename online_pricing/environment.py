@@ -12,8 +12,8 @@ class EnvironmentBase:
         self.__n_products = 5
         self.n_groups = 3
         self.prices_and_margins = {
-            "product_1": {25: 2, 12: 4, 14: 5, 15: 2},  # TODO look at plot
-            "product_2": {25: 2, 12: 4, 14: 5, 15: 2},
+            "echo_dot": {34: .05, 12: 4, 14: 5, 15: 2},  # TODO look at plot
+            "ring_chime": {36: 2, 12: 4, 14: 5, 15: 2},
             "product_3": {25: 2, 12: 4, 14: 5, 15: 2},
             "product_4": {25: 2, 12: 4, 14: 5, 15: 2},
         }
