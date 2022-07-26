@@ -1,5 +1,5 @@
 import random
-from typing import Any, Type
+from typing import Any, Type, TypeVar, Union
 
 import numpy as np
 
@@ -20,18 +20,46 @@ class Simulator(object):
         # daily data
         self._daily_data = dict()
         self._users_data = dict()
-        self.current_learner: Learner | None = None
+        self.current_learner: Learner | None = TSLearner(n_arms=5, prices=self.prices)
 
     def _init_r(self):
         pass
 
+    def sim_one_day(self) -> None:
+        """
+        Simulate what happens in one day.
+
+        This function simulates what would happen in a real world scenario.
+        Clients interact with a primary product. Each client belongs to a group which has
+        different probability distributions - meaning behaviours - that determines the outcome of a
+        visit. After each client interaction, the current learner (belonging to the current
+        configuration of prices) is updated. Then, the cumulative sold products array is updated
+        along with the empirical influence matrix that records the jumps to secondary products.
+        """
+        direct_clients = self.environment.get_direct_clients()
+        products_sold: list[int, int] = [0] * self.environment.n_products
+        influence_matrix = [[0] * self.environment.n_products] * self.environment.n_products
+
+        for group in self.groups:
+            for client_id, primary_product in direct_clients[f"group_{group}"]:
+                buys, influenced = self.sim_one_user(
+                    group=group,
+                    client_id=client_id,
+                    product_id=primary_product,
+                    product_graph=self.environment.distributions_parameters["product_graph"].copy(),
+                    prices=self.prices,
+                )
+                self.update_learner(buys)
+                products_sold = sum_by_element(products_sold, buys)
+                influence_matrix = sum_by_element(influence_matrix, influenced)
+
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
-        Simulate a buy of a product for a user belonging into a group.
+        Simulate the buy of a product for a user belonging to a group.
 
         If the willing_price of a user is higher than the price of the product, the user will buy
-        it. Then, the quantity of the number of units bought will be decided, independently of the
-        willing_price of a user, tby sampling a probability distribution.
+        it. Next, the quantity of units bought will be decided, independently of the
+        willing_price of a user, by sampling a probability distribution.
 
         :param group: group of the user
         :param product_id: product id
@@ -46,96 +74,78 @@ class Simulator(object):
         return n_units
 
     def sim_one_user(
-        self, group: int, client_id: str, product_id: int, product_graph: Any, prices: list[float]
-    ) -> list[int]:
+        self, group: int, client_id: int, product_id: int, product_graph: Any, prices: list[float]
+    ) -> tuple[list[int], list[list[int]]]:
         """
         Function to simulate the behavior of a single user.
 
-        Each entry of the returned array corresponds to a product and its quantity bought.
-        A user may start from a primary product and then buy secondary products. Then, for each
+        A user may start from a primary product and then buy secondary products. Next, for each
         secondary product, he may buy a number of units and interact with other secondary products.
         This is done recursively while updating the product_graph matrix to remove cycles.
-        The secondary products are chosen based on the product_graph matrix, by choosing the most
-        probable product to be bought. This is handled clairvoyantly by an external company.
+        The secondary products are chosen based on the product_graph matrix, using the most
+        probable product to be bought. This is product is fixed and selected clairvoyantly by an
+        external company. In the end, an array with the number of units bought per product is
+        returned, along with the influence matrix.
 
         :param group: group of the user
         :param client_id: id of the user
         :param product_id: product to simulate the behavior of the user
         :param product_graph: secondary product probability graph
         :param prices: prices of the products
-        :return: list of number of units bought per products
+        :return: list of number of units bought per product and the influencing matrix
         """
+        # Instantiate buys and influence matrix
         buys: list[int] = [
             0 if idx != product_id else self.sim_buy(group, product_id, prices[product_id])
             for idx in range(self.environment.n_products)
         ]
+        influence_matrix = [[0] * self.environment.n_products] * self.environment.n_products
+
+        # If user didn't buy primary_product, return
         if not buys[product_id]:
-            return buys
+            return buys, influence_matrix
 
         # Remove cycles
         product_graph[:, product_id] = 0
+
         # Argmax of probabilities
         first_advised = np.argsort(product_graph[product_id])[-1]
         if random.random() < product_graph[product_id][first_advised]:
-            # This is a sum by element of a pair of arrays
-            buys = [
-                sum(products)
-                # The second entry is a recursion over the advised product
-                for products in zip(
-                    buys, self.sim_one_user(group, client_id, first_advised, product_graph, prices)
-                )
-            ]
+            # Update influence matrix with the current jump
+            influence_matrix[product_id][first_advised] += 1
+            # Simulate recursively
+            following_buys, following_influence = self.sim_one_user(
+                group, client_id, first_advised, product_graph, prices
+            )
+            # Update buys and influence matrix from recursive call
+            buys = sum_by_element(buys, following_buys)
+            influence_matrix = sum_by_element(influence_matrix, following_influence)
 
+        # Do the same with the second secondary product
         second_advised = np.argsort(product_graph[product_id])[-2]
         if random.random() < product_graph[product_id][second_advised] * self._lambda:
-            buys = [
-                sum(products)
-                for products in zip(
-                    buys, self.sim_one_user(group, client_id, second_advised, product_graph, prices)
-                )
-            ]
+            influence_matrix[product_id][second_advised] += 1
+            following_buys, following_influence = self.sim_one_user(
+                group, client_id, second_advised, product_graph, prices
+            )
+            buys = sum_by_element(buys, following_buys)
+            influence_matrix = sum_by_element(influence_matrix, following_influence)
 
-        return buys
+        return buys, influence_matrix
 
-    def update_learners(self, learner: Learner, buys: list[int]) -> None:
+    # TODO: might be per group
+    def update_learner(self, buys: list[int]) -> None:
         """
         Update current learner with the buys of the user.
 
         The reward is 1 if the user bought a product, 0 otherwise.
 
-        :param learner: learner to update
         :param buys: list of number of units bought per product
         """
         did_buy = [int(buy > 0) for buy in buys]
 
         for idx, bought in enumerate(did_buy):
-            learner.update(arm_pulled=idx, reward=bought)
-
-    def sim_one_day(self) -> None:
-        """
-        Simulate what happens in one day.
-
-        This function simulates what would happen in a real world scenario.
-        Clients interact with a primary product, each client belongs to a group which has
-        different probability distributions - behaviours - that determines the outcome of a visit.
-        After each client interaction, the current learner (belonging to the current configuration
-        of prices) is updated. Then, the cumulative sold products array is updated.
-        """
-        direct_clients = self.environment.get_direct_clients()
-        self._users_data = dict()
-        products_sold: list[int, int] = [0 for _ in range(self.environment.n_products)]
-
-        for group in self.groups:  # for each group
-            for client_id, first_product in direct_clients[f"group_{group}"]:  # for each webpage
-                buys = self.sim_one_user(
-                    group=group,
-                    client_id=client_id,
-                    product_id=first_product,
-                    product_graph=self.environment.distributions_parameters["product_graph"].copy(),
-                    prices=self.prices,
-                )
-                self.update_learners(self.current_learner, buys)
-                products_sold = [sum(products) for products in zip(buys, products_sold)]
+            self.current_learner.update(arm_pulled=idx, reward=bought)
 
     # TODO: here goes the greedy part of the simulation
     # def sim_one_day_greedy(self):
@@ -242,6 +252,17 @@ class Simulator(object):
     #             return
     #
     #         greedy_environment.round(best_update, max_cumulative_expected_margin)
+
+
+def sum_by_element(array_1: list[Any], array_2: list[Any]) -> list[Any]:
+    """Sum lists - or matrices - by element."""
+    if type(array_1) is not type(array_2):
+        raise TypeError(f"Arrays must be of the same type, got {type(array_1)} and {type(array_2)}")
+
+    if isinstance(array_1[0], list):
+        return [sum_by_element(a1, a2) for a1, a2 in zip(array_1, array_2)]
+
+    return [sum(items) for items in zip(array_1, array_2)]
 
 
 def get_buys_reward(buys_dict: dict[str, dict[int, int]], margins: Any) -> int:

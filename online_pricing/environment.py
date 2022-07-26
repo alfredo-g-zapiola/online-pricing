@@ -4,10 +4,9 @@ import numpy as np
 
 # from scipy.stats import wishart
 import rpy2
+import rpy2.robjects as robjects
 
 from online_pricing.learner import GreedyLearner
-
-# import rpy2.robjects as robjects
 
 
 class EnvironmentBase:
