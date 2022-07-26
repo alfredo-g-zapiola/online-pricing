@@ -20,7 +20,7 @@ class Simulator(object):
         # daily data
         self._daily_data = dict()
         self._users_data = dict()
-        self.current_learner: Learner | None = TSLearner(n_arms=5, prices=self.prices)
+        self.current_learner: Learner | None = None
 
     def _init_r(self):
         pass
