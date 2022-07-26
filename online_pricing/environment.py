@@ -133,13 +133,16 @@ class EnvironmentBase:
         n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in self.__n_users]
 
         direct_clients = {
-            f"group_{idx}": list(zip(
-                np.random.choice(
-                    range(cumsum_clients[idx], cumsum_clients[idx + 1]),
-                    size=n_direct_clients[idx], replace=False
-                ),
-                np.random.choice(range(self.n_products), n_direct_clients[idx]),
-            ))
+            f"group_{idx}": list(
+                zip(
+                    np.random.choice(
+                        range(cumsum_clients[idx], cumsum_clients[idx + 1]),
+                        size=n_direct_clients[idx],
+                        replace=False,
+                    ),
+                    np.random.choice(range(self.n_products), n_direct_clients[idx]),
+                )
+            )
             for idx, n_group in enumerate(self.__n_users)
         }
         return direct_clients
@@ -151,7 +154,7 @@ class EnvironmentBase:
         :return:
         """
         # TODO(alfre) This should be strictly greater than 0
-        return self.distributions_parameters["quantity_demanded_params"]["group " + str(group)]
+        return self.distributions_parameters["quantity_demanded_params"]["group_" + str(group)]
 
 
 class GreedyEnvironment(EnvironmentBase):

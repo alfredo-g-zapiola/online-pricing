@@ -72,7 +72,7 @@ class Ucb(Learner):
 
 
 class TSLearner(Learner):
-    def __init__(self, n_arms: int, prices: list[int]):
+    def __init__(self, n_arms: int, prices: list[float]):
         super().__init__(n_arms)
         self.beta_parameters = np.ones((n_arms, 2))
         self.prices = prices
@@ -84,7 +84,7 @@ class TSLearner(Learner):
         )
         return int(idx)
 
-    def update(self, pulled_arm: int, reward: int) -> None:
-        super().update(pulled_arm, reward)
-        self.beta_parameters[pulled_arm, 0] = self.beta_parameters[pulled_arm, 0] + reward
-        self.beta_parameters[pulled_arm, 1] = self.beta_parameters[pulled_arm, 1] + 1.0 - reward
+    def update(self, arm_pulled: int, reward: int) -> None:
+        super().update(arm_pulled, reward)
+        self.beta_parameters[arm_pulled, 0] = self.beta_parameters[arm_pulled, 0] + reward
+        self.beta_parameters[arm_pulled, 1] = self.beta_parameters[arm_pulled, 1] + 1.0 - reward

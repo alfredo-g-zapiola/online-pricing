@@ -4,7 +4,7 @@ from typing import Any, Type
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase, GreedyEnvironment
-from online_pricing.learner import Learner
+from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 
 
@@ -13,7 +13,6 @@ class Simulator(object):
         self.seed = seed
         self.groups = range(3)
         self.__SocialInfluence = None
-        self.current_learner: Learner | None = None
         self.environment = environment()
         self.prices = [19.99, 16.7, 12.15, 8.0, 35.0]
         # lambda to go to second secondary product
@@ -21,6 +20,7 @@ class Simulator(object):
         # daily data
         self._daily_data = dict()
         self._users_data = dict()
+        self.current_learner: Learner | None = None
 
     def _init_r(self):
         pass
@@ -69,13 +69,11 @@ class Simulator(object):
             0 if idx != product_id else self.sim_buy(group, product_id, prices[product_id])
             for idx in range(self.environment.n_products)
         ]
-
         if not buys[product_id]:
             return buys
 
         # Remove cycles
         product_graph[:, product_id] = 0
-
         # Argmax of probabilities
         first_advised = np.argsort(product_graph[product_id])[-1]
         if random.random() < product_graph[product_id][first_advised]:
@@ -128,10 +126,7 @@ class Simulator(object):
                     prices=self.prices,
                 )
                 self.update_learners(self.current_learner, buys)
-
-                products_sold = [
-                    sum(products) for products in zip(buys[first_product], products_sold)
-                ]
+                products_sold = [sum(products) for products in zip(buys, products_sold)]
 
     # TODO: here goes the greedy part of the simulation
     # def sim_one_day_greedy(self):
