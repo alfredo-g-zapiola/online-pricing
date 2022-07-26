@@ -17,12 +17,12 @@ class Simulator(object):
         self.environment = environment()
         self.prices = [19.99, 16.7, 12.15, 8.0, 35.0]
         # lambda to go to second secondary product
-        self.__lambda = 0.5
+        self._lambda = 0.5
         # daily data
-        self.__daily_data = dict()
-        self.__users_data = dict()
+        self._daily_data = dict()
+        self._users_data = dict()
 
-    def __init_R(self):
+    def _init_r(self):
         pass
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
@@ -31,7 +31,7 @@ class Simulator(object):
 
         If the willing_price of a user is higher than the price of the product, the user will buy
         it. Then, the quantity of the number of units bought will be decided, independently of the
-        willing_price of a user.
+        willing_price of a user, tby sampling a probability distribution.
 
         :param group: group of the user
         :param product_id: product id
@@ -79,16 +79,17 @@ class Simulator(object):
         # Argmax of probabilities
         first_advised = np.argsort(product_graph[product_id])[-1]
         if random.random() < product_graph[product_id][first_advised]:
-            # Recursion on next product
+            # This is a sum by element of a pair of arrays
             buys = [
                 sum(products)
+                # The second entry is a recursion over the advised product
                 for products in zip(
                     buys, self.sim_one_user(group, client_id, first_advised, product_graph, prices)
                 )
             ]
 
         second_advised = np.argsort(product_graph[product_id])[-2]
-        if random.random() < product_graph[product_id][second_advised] * self.__lambda:
+        if random.random() < product_graph[product_id][second_advised] * self._lambda:
             buys = [
                 sum(products)
                 for products in zip(
@@ -114,8 +115,9 @@ class Simulator(object):
 
     def sim_one_day(self):
         direct_clients = self.environment.get_direct_clients()
-        self.__users_data = dict()
+        self._users_data = dict()
         products_sold: list[int, int] = [0 for _ in range(self.environment.n_products)]
+
         for group in self.groups:  # for each group
             for client_id, first_product in direct_clients[f"group_{group}"]:  # for each webpage
                 buys = self.sim_one_user(
@@ -137,7 +139,7 @@ class Simulator(object):
     #     self.__SocialInfluence = SocialInfluence(self.environment.sample_n_users())
     #     direct_clients = self.environment.get_direct_clients()
     #
-    #     self.__users_data = dict()
+    #     self._users_data = dict()
     #     # Secondary products probability graph
     #     product_graph = self.environment.distributions_parameters["product_graph"]
     #     # Initial configuration
@@ -160,7 +162,7 @@ class Simulator(object):
     #     # We now see how these customers have influenced their contacts and simulate what happens to those
     #     # they brought to our product websites
     #     influenced_clients_prods: dict[str, int] = self.__SocialInfluence.simulate_influence(
-    #         self.__users_data
+    #         self._users_data
     #     )
     #
     #     # Simulate buys for indirect clients

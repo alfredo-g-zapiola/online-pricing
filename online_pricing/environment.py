@@ -4,9 +4,10 @@ import numpy as np
 
 # from scipy.stats import wishart
 import rpy2
-import rpy2.robjects as robjects
 
 from online_pricing.learner import GreedyLearner
+
+# import rpy2.robjects as robjects
 
 
 class EnvironmentBase:
@@ -74,7 +75,7 @@ class EnvironmentBase:
         self.__init_R()
 
         # have the number of users
-        self.__n_users = None
+        self.__n_users = (10, 20, 5)
 
     def __init_R(self):
         """
@@ -84,13 +85,13 @@ class EnvironmentBase:
 
         # TODO
 
-        robjects.r(
-            """ 
-        install.packages("roahd")
-        library(roahd)
-        print("Package correctly installed"
-        """
-        )
+        # robjects.r(
+        #     """
+        # install.packages("roahd")
+        # library(roahd)
+        # print("Package correctly installed"
+        # """
+        # )
 
     def sample_n_users(self):
         """
@@ -118,17 +119,27 @@ class EnvironmentBase:
         """
         return 0
 
-    # TODO(fil) this should return a tuple of client_id and first product
-    def get_direct_clients(self):
+    def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
         """
+        Get all direct clients, for each group, with their respective primary product.
 
-        :return:
-        z
+        This function return a dictionary with an entry for each group. For each entry, a list of
+        tuples that represent (client_id, primary_product_id).
+
+        :return: the direct clients with their primary product.
         """
+        cumsum_clients = [0, *np.cumsum(self.__n_users)]
+        # TODO: not uniform
+        n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in self.__n_users]
+
         direct_clients = {
-            f"group_{idx}": np.random.choice(
-                range(n_group), size=np.random.uniform(0, n_group)[5, 70, 95]
-            )  # TODO not uniform
+            f"group_{idx}": list(zip(
+                np.random.choice(
+                    range(cumsum_clients[idx], cumsum_clients[idx + 1]),
+                    size=n_direct_clients[idx], replace=False
+                ),
+                np.random.choice(range(self.n_products), n_direct_clients[idx]),
+            ))
             for idx, n_group in enumerate(self.__n_users)
         }
         return direct_clients
@@ -139,6 +150,7 @@ class EnvironmentBase:
         :param group:
         :return:
         """
+        # TODO(alfre) This should be strictly greater than 0
         return self.distributions_parameters["quantity_demanded_params"]["group " + str(group)]
 
 
