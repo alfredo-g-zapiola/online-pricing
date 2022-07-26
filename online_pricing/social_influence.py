@@ -4,7 +4,7 @@ import numpy as np
 class SocialInfluence:
     def __init__(self, todays_users):
         # todays_users looks like this: [100 200 150]
-        self.todays_users= todays_users
+        self.todays_users = todays_users
 
         # TODO creare qui 3 graphs: 3 init prob matrices created with uniform
         # cardinalita di ogni graph e' il numero di users
@@ -43,7 +43,7 @@ class SocialInfluence:
 
         # costruire newly_active customers:
         # [(index cliente, prodotto, probabilita')]
-        newly_active_customers = [(19, 3, .7), (76, 5, .1)]
+        newly_active_customers = [(19, 3, 0.7), (76, 5, 0.1)]
         return newly_active_customers
 
     def __simulate_influence_graph(self, init_prob_matrix, n_steps_max, initdata, group_number):

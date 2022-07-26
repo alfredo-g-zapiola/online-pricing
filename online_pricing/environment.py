@@ -1,5 +1,7 @@
-import numpy as np
 from abc import abstractmethod
+
+import numpy as np
+
 # from scipy.stats import wishart
 import rpy2
 import rpy2.robjects as robjects
@@ -9,17 +11,17 @@ from online_pricing.learner import GreedyLearner
 
 class EnvironmentBase:
     def __init__(self) -> None:
-        self.__n_products = 5
+        self.n_products = 5
         self.n_groups = 3
         self.prices_and_margins = {
-            "echo_dot": {34: .05, 12: 4, 14: 5, 15: 2},  # TODO look at plot
+            "echo_dot": {34: 0.05, 12: 4, 14: 5, 15: 2},  # TODO look at plot
             "ring_chime": {36: 2, 12: 4, 14: 5, 15: 2},
             "product_3": {25: 2, 12: 4, 14: 5, 15: 2},
             "product_4": {25: 2, 12: 4, 14: 5, 15: 2},
         }
 
         # function parameters (can also be opened with a json)
-        self.__distributions_parameters = {
+        self.distributions_parameters = {
             "n_people_params": {"group_0": 50, "group_1": 20, "group_2": 70},
             "dirichlet_params": {  # TODO dobbiamo giustificare le scelte qui
                 "group 0": (7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117),
@@ -98,7 +100,7 @@ class EnvironmentBase:
         """
         self.__n_users = [
             np.random.poisson(
-                self.__distributions_parameters["n_people_params"]["group_" + str(i)], 1
+                self.distributions_parameters["n_people_params"]["group_" + str(i)], 1
             )
             for i in range(3)
         ]
@@ -116,20 +118,18 @@ class EnvironmentBase:
         """
         return 0
 
-    @abstractmethod
+    # TODO(fil) this should return a tuple of client_id and first product
     def get_direct_clients(self):
         """
 
         :return:
         z
         """
-        ng1, ng2, ng3 = self.__n_users
         direct_clients = {
-            "group_1": np.random.choice(
-                range(ng1), size=np.random.uniform(0, ng1) [5, 70, 95]
-            ),  # TODO not uniform
-            "group_2": np.random.choice(range(ng1, ng2), size=np.random.uniform(0, ng2)),
-            "group_3": np.random.choice(range(ng2, ng3), size=np.random.uniform(0, ng3)),
+            f"group_{idx}": np.random.choice(
+                range(n_group), size=np.random.uniform(0, n_group)[5, 70, 95]
+            )  # TODO not uniform
+            for idx, n_group in enumerate(self.__n_users)
         }
         return direct_clients
 
@@ -139,7 +139,7 @@ class EnvironmentBase:
         :param group:
         :return:
         """
-        return self.__distributions_parameters["quantity_demanded_params"]["group " + str(group)]
+        return self.distributions_parameters["quantity_demanded_params"]["group " + str(group)]
 
 
 class GreedyEnvironment(EnvironmentBase):
@@ -150,7 +150,7 @@ class GreedyEnvironment(EnvironmentBase):
             GreedyLearner(
                 n_arms=4, prices=list(self.prices_and_margins["product_" + str(i)].values())
             )
-            for i in range(self.__n_products)
+            for i in range(self.n_products)
         ]  # first configuration [0, 0, 0, 0, 0]
 
     def round(self, best_update: int, reward: int):
