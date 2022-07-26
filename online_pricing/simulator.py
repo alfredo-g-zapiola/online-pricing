@@ -111,7 +111,16 @@ class Simulator(object):
         for idx, bought in enumerate(did_buy):
             learner.update(arm_pulled=idx, reward=bought)
 
-    def sim_one_day(self):
+    def sim_one_day(self) -> None:
+        """
+        Simulate what happens in one day.
+
+        This function simulates what would happen in a real world scenario.
+        Clients interact with a primary product, each client belongs to a group which has
+        different probability distributions - behaviours - that determines the outcome of a visit.
+        After each client interaction, the current learner (belonging to the current configuration
+        of prices) is updated. Then, the cumulative sold products array is updated.
+        """
         direct_clients = self.environment.get_direct_clients()
         self._users_data = dict()
         products_sold: list[int, int] = [0 for _ in range(self.environment.n_products)]
