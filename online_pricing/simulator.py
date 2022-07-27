@@ -137,6 +137,97 @@ class Simulator(object):
                 self.update_learners(self.current_learner, buys)
                 products_sold = [sum(products) for products in zip(buys, products_sold)]
 
+    def formula(self, alpha, conversion_rates, margins, influence_probability):
+        s1 = 0
+        s2 = 0
+        sum = 0
+        for i in range(0,5):
+            s1 += conversion_rates[i]*margins[i]
+            for j in range(0,5):
+                if i != j:
+                    s2 += influence_probability[i,j]*conversion_rates[j]*margins[j]
+            sum = sum + alpha[i]*(s1 + s2)
+            s2 = 0
+            s1 = 0
+        return sum
+
+    def greedy_algorithm(self, alpha, conversion_rates, margins, influence_probability):        #greedy alg without considering groups. Alpha il a list of 5 elements,
+        prices = [0,0,0,0,0]                                                                    #conversion_rates and margins are matrix 5x4 (products x prices)
+        max = self.formula(alpha, conversion_rates[:,0], margins[:,0], influence_probability)   #influence_probability is a matrix 5x5 (products x products) where cell ij is the
+        while True:                                                                             #probability to go from i to j
+            changed = False
+            best = prices
+            for i in range(0,5):
+                temp = prices
+                cr = []
+                mr = []
+                temp[i] += 1
+                if temp[i] > 3:
+                    temp[i] = 3
+                for j in range(0,5):
+                    cr.append(conversion_rates[j, temp[j]])
+                    mr.append(margins[j, temp[j]])
+                n = self.formula(alpha, cr, mr, influence_probability)
+                if n > max:
+                    max = n
+                    best = temp
+                    changed = True
+            if not changed:
+                return best
+            if changed:
+                prices = best
+
+
+    def formula_with_groups(self, list_alpha, conversion_rates, margins, influence_probability):
+        s1 = 0
+        s2 = 0
+        sum = 0
+        for g in range (0,3):
+            for i in range(0,5):
+                s1 += conversion_rates[g][i]*margins[i]
+                for j in range(0,5):
+                    if i != j:
+                        s2 += influence_probability[i,j]*conversion_rates[g][j]*margins[j]
+                sum = sum + list_alpha[g][i]*(s1 + s2)
+                s2 = 0
+                s1 = 0
+        return sum
+
+    def greedy_algorithm_with_groups(self, list_alpha, list_conversion_rates, margins, influence_probability):      #greedy algorithm considering groups. Same as before except for:
+        prices = [0,0,0,0,0]                                                                                        #list_alpha is a list of 3 lists where each list contains 5 elements
+        conversion_rates = []                                                                                       #list_conversion_rates is a list of 3 matrices where each matrix is 5x4 (products x prices)
+        for g in range(0,3):
+            conversion_rates.append(list_conversion_rates[g][:,0])
+        max = self.formula_with_groups(list_alpha, conversion_rates, margins[:,0], influence_probability)
+        while True:
+            changed = False
+            best = prices
+            for i in range(0,5):
+                temp = prices
+                cr = [[0 for v in range(5)] for w in range(3)]
+                mr = []
+                temp[i] += 1
+                if temp[i] > 3:
+                    temp[i] = 3
+                for g in range(0,3):
+                    for j in range(0,5):
+                        cr[g][j] = list_conversion_rates[g][j, temp[j]]
+                for k in range (0,5):
+                    mr.append(margins[k, temp[k]])
+                n = self.formula_with_groups(list_alpha, cr, mr, influence_probability)
+                if n > max:
+                    max = n
+                    best = temp
+                    changed = True
+            if not changed:
+                return best
+            if changed:
+                prices = best
+
+
+
+
+
     # TODO: here goes the greedy part of the simulation
     # def sim_one_day_greedy(self):
     #     # TODO define well social influence build matrix HERE
