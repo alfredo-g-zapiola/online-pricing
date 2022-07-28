@@ -1,9 +1,9 @@
-#install.packages("roahd")
-        library(roahd)
-        print("Package correctly installed and loaded")
-        set.seed(20)
 
-        # a function to control the sampled conversion rate is between 0 and 1
+library(roahd)
+print("Package correctly installed and loaded")
+set.seed(20)
+
+# a function to control the sampled conversion rate is between 0 and 1
 clipper.f <- function(f.t){
       if (f.t > 1){
         return (1)
