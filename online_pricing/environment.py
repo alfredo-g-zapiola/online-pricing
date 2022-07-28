@@ -3,8 +3,8 @@ from abc import abstractmethod
 import numpy as np
 
 # from scipy.stats import wishart
-import rpy2
 import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
 
 from online_pricing.learner import GreedyLearner
 
@@ -29,7 +29,7 @@ class EnvironmentBase:
                 "group 3": (12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984),
             },
             # for the quantity chosen daily we have a ... distribution
-            "quantity_demanded_params": {"group 0": {}, "group 1": {}, "group 3": {}},
+            "quantity_demanded_params": {"group 0": 1, "group 1": 2, "group 3": 3},
             # product graph probabilities
             "product_graph": np.array(
                 [
@@ -78,19 +78,18 @@ class EnvironmentBase:
 
     def __init_R(self):
         """
-        start R and download the roahd package
+        start R and download the roahd package, define the functions of the demand curves
         :return: void
         """
+        # Install the roahd package
+        utils = importr('utils')
+        utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
+        utils.install_packages("roahd")
+        with open('online_pricing/initialise_R.R', 'r') as file:
+            code = file.read().rstrip()
+            robjects.r(code)
 
-        # TODO
 
-        # robjects.r(
-        #     """
-        # install.packages("roahd")
-        # library(roahd)
-        # print("Package correctly installed"
-        # """
-        # )
 
     def sample_n_users(self):
         """
@@ -109,14 +108,56 @@ class EnvironmentBase:
     def sample_affinity(self, prod_id, group, first=True):
         return np.random.uniform(0, 1)
 
-    def sample_demand_curve(self, group, prod_id):
+    def sample_demand_curve(self, group, prod_id, price, uncertain=False):
         """
 
-        :param group:
-        :param prod_id:
+        :param group: the id of the group
+        :param prod_id: the id of the product
+        :param price: the price at which we want to sample
         :return: a price the client is willing to pay
         """
-        return 0
+        def get_fname(prod_id, group):
+
+            fname = str()
+            prodname = str()
+
+            # python 3.10 for match
+            match prod_id:
+                case 0:
+                    prodname = "echo_dot"
+                case 1:
+                    prodname = "ring_chime"
+                case 2:
+                    prodname = "ring_f"
+                case 3:
+                    prodname = "ring_v"
+                case 4:
+                    prodname = "echo_show"
+                case _:
+                    print("This should never happen")
+
+            match group:
+                case 0:
+                    fname = prodname + "_poor"
+                case 1:
+                    fname = prodname
+                case 2:
+                    fname = prodname + "_rich"
+                case _:
+                    print("This should never happen")
+            return fname
+        fname = get_fname(prod_id, group)
+        print(fname)
+        if uncertain:
+            d = robjects.r("""
+                d <- sample.demand({}, {}, 0, 200 )
+            """.format(fname, price))
+            return robjects.r("d")[0]
+        else:
+            curve_f = robjects.r["{}".format(fname)]
+            return curve_f(price)[0]
+
+
 
     def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
         """
@@ -146,14 +187,17 @@ class EnvironmentBase:
         }
         return direct_clients
 
-    def sample_quantity_bought(self, group):
+    def sample_quantity_bought(self, group, uncertain=False):
         """
 
         :param group:
         :return:
         """
-        # TODO(alfre) This should be strictly greater than 0
-        return self.distributions_parameters["quantity_demanded_params"]["group_" + str(group)]
+        m = self.distributions_parameters["quantity_demanded_params"]["group_" + str(group)]
+        if uncertain:
+            return np.random.poisson(m)
+        else:
+            return m
 
 
 class GreedyEnvironment(EnvironmentBase):

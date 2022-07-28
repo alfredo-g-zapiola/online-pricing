@@ -42,7 +42,7 @@ class SocialInfluence:
         # si sceglie come prodotto la prob influence massima, con il numero di prodotto
 
         # costruire newly_active customers:
-        # [(index cliente, prodotto, probabilita')]
+        # [(index   cliente, prodotto, probabilita')]
         newly_active_customers = [(19, 3, 0.7), (76, 5, 0.1)]
         return newly_active_customers
 
