@@ -155,7 +155,7 @@ class Simulator(object):
             s1 += conversion_rates[i]*margins[i]
             for j in range(0,5):
                 if i != j:
-                    s2 += influence_probability[i,j]*conversion_rates[j]*margins[j]
+                    s2 += influence_probability[i][j]*conversion_rates[j]*margins[j]
             sum = sum + alpha[i]*(s1 + s2)
             s2 = 0
             s1 = 0
@@ -205,7 +205,7 @@ class Simulator(object):
                 s1 += conversion_rates[g][i]*margins[i]
                 for j in range(0,5):
                     if i != j:
-                        s2 += influence_probability[i,j]*conversion_rates[g][j]*margins[j]
+                        s2 += influence_probability[i][j]*conversion_rates[g][j]*margins[j]
                 sum = sum + list_alpha[g][i]*(s1 + s2)
                 s2 = 0
                 s1 = 0
