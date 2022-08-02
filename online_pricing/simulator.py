@@ -161,8 +161,16 @@ class Simulator(object):
             s1 = 0
         return sum
 
+    def __wrap_influence_probability(self):
+        """
+        Adjust for conversion rates and for the lambda (in case of second seconary product)
+        for every starting node in influence_probability
+        :return:
+        """
+        pass
+
     def greedy_algorithm(self, alpha, conversion_rates, margins, influence_probability):        #greedy alg without considering groups. Alpha il a list of 5 elements,
-        prices = [0,0,0,0,0]                                                                    #conversion_rates and margins are matrix 5x4 (products x prices)
+        prices = [0, 0,0,0,0]                                                                    #conversion_rates and margins are matrix 5x4 (products x prices)
         max = self.formula(alpha, conversion_rates[:,0], margins[:,0], influence_probability)   #influence_probability is a matrix 5x5 (products x products) where cell ij is the
         while True:                                                                             #probability to go from i to j
             changed = False

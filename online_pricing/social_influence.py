@@ -6,6 +6,8 @@ class SocialInfluence:
         self.n_products = 5
         self.n_episodes = 1000
         self.n_steps_max = 10  # da definire in base ai costumers
+        self.dataset = list()
+
 
 def simulate_episode(init_prob_matrix, n_step_max):
  prob_matrix = init_prob_matrix.copy()
@@ -24,6 +26,7 @@ def simulate_episode(init_prob_matrix, n_step_max):
     history = np.concatenate((history, [newly_active_products]), axis=0)
     t += 1
  return history #storico nodi (prodotti) attivati
+
 
 def estimate_probabilities(dataset, node_index, n_products):
     estimated_prob= np.ones(n_products)*1.0/(n_products-1)
@@ -51,9 +54,10 @@ node_index=4
 dataset=[]
 
 for e in range(0,n_episodes):
-    dataset.append(simulate_episode(init_prob_matrix=prob_matrix,n_step_max=10))
+    dataset.append(simulate_episode(init_prob_matrix=prob_matrix, n_step_max=10))
 
-estimate_prob=estimate_probabilities(dataset=dataset,node_index=node_index,n_products=n_products)
+estimate_prob=estimate_probabilities(dataset=dataset,node_index=2,n_products=n_products)
+final_list = [estimate_probabilities(dataset, i, n_products) for i in range(5)]
 # [0.30 0.18 0.25 0. ]
 print("True P matrix:   ", prob_matrix[:,4])
 print("Estimated P matrix:  ",estimate_prob)
