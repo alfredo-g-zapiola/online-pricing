@@ -22,9 +22,6 @@ class Simulator(object):
         self._users_data = dict()
         self.current_learner: Learner | None = None
 
-    def _init_r(self):
-        pass
-
     def sim_one_day(self) -> None:
         """
         Simulate what happens in one day.

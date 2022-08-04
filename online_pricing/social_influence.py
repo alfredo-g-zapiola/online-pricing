@@ -30,7 +30,7 @@ class SocialInfluence:
     def add_episode(self, episode):
         """
         Adds the episode of a user. Consumed at sim_one_user
-        :param episode:
+        :param episode: a list of lists
         :return:
         """
         self.dataset.append(episode)

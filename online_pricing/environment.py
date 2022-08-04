@@ -89,8 +89,6 @@ class EnvironmentBase:
             code = file.read().rstrip()
             robjects.r(code)
 
-
-
     def sample_n_users(self):
         """
         Samples from the poisson distribution how many new potential clients of each group arrive on the current day
@@ -116,6 +114,7 @@ class EnvironmentBase:
         :param price: the price at which we want to sample
         :return: a price the client is willing to pay
         """
+
         def get_fname(prod_id, group):
 
             fname = str()
@@ -146,6 +145,7 @@ class EnvironmentBase:
                 case _:
                     print("This should never happen")
             return fname
+
         fname = get_fname(prod_id, group)
         print(fname)
         if uncertain:
@@ -156,8 +156,6 @@ class EnvironmentBase:
         else:
             curve_f = robjects.r["{}".format(fname)]
             return curve_f(price)[0]
-
-
 
     def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
         """
@@ -199,6 +197,13 @@ class EnvironmentBase:
         else:
             return m
 
+        def compute_clairvoyant(self):
+            """
+            Finds the optimal superarm that maximises the utility gains
+            :param self:
+            :return: optimital superarm
+            """
+            return list()
 
 class GreedyEnvironment(EnvironmentBase):
     def __init__(self) -> None:
@@ -212,7 +217,6 @@ class GreedyEnvironment(EnvironmentBase):
         ]  # first configuration [0, 0, 0, 0, 0]
 
     def round(self, best_update: int, reward: int):
-
         self.learners[best_update].update(self.learners[best_update].act(), reward)
 
 
