@@ -82,10 +82,10 @@ class EnvironmentBase:
         :return: void
         """
         # Install the roahd package
-        utils = importr('utils')
+        utils = importr("utils")
         utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
         utils.install_packages("roahd")
-        with open('online_pricing/initialise_R.R', 'r') as file:
+        with open("online_pricing/initialise_R.R", "r") as file:
             code = file.read().rstrip()
             robjects.r(code)
 
@@ -149,9 +149,13 @@ class EnvironmentBase:
         fname = get_fname(prod_id, group)
         print(fname)
         if uncertain:
-            d = robjects.r("""
+            d = robjects.r(
+                """
                 d <- sample.demand({}, {}, 0, 200 )
-            """.format(fname, price))
+            """.format(
+                    fname, price
+                )
+            )
             return robjects.r("d")[0]
         else:
             curve_f = robjects.r["{}".format(fname)]
@@ -204,6 +208,7 @@ class EnvironmentBase:
             :return: optimital superarm
             """
             return list()
+
 
 class GreedyEnvironment(EnvironmentBase):
     def __init__(self) -> None:

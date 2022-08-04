@@ -4,8 +4,9 @@ import numpy as np
 class Learner:
     """Base learner class for the project."""
 
-    def __init__(self, n_arms: int):
+    def __init__(self, n_arms: int, prices: list[float]):
         self.t = 0
+        self.prices = sorted(prices)
         self.n_arms = n_arms
         self.rewards: list[int] = []
         self.rewards_per_arm: list[list[int]] = [[] for _ in range(n_arms)]
@@ -23,6 +24,9 @@ class Learner:
         self.rewards_per_arm[arm_pulled].append(reward)
         self.pulled_arms.append(arm_pulled)
 
+    def get_arm(self, price: float) -> int:
+        return self.prices.index(price)
+
 
 class GreedyLearner(Learner):
     """Greedy learner.
@@ -32,11 +36,10 @@ class GreedyLearner(Learner):
     """
 
     def __init__(self, n_arms: int, prices: list[int]):
-        super().__init__(n_arms)
-        self.prices = sorted(prices)
+        super().__init__(n_arms, prices)
         self.current_price = 0
 
-    def act(self) -> int:
+    def act(self) -> float:
         return self.prices[self.current_price]
 
     def greedy_act(self) -> int | None:
@@ -51,10 +54,9 @@ class GreedyLearner(Learner):
 
 class Ucb(Learner):
     def __init__(self, n_arms: int, prices: list[int]):
-        super().__init__(n_arms)
+        super().__init__(n_arms, prices)
         self.means = np.zeros(n_arms)
         self.widths = np.array([np.inf for _ in range(n_arms)])
-        self.prices = prices
 
     def act(self) -> int:
         idx = np.argmax((self.means + self.widths))
@@ -73,9 +75,8 @@ class Ucb(Learner):
 
 class TSLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):
-        super().__init__(n_arms)
+        super().__init__(n_arms, prices)
         self.beta_parameters = np.ones((n_arms, 2))
-        self.prices = prices
 
     def pull_arm(self) -> int:
         idx = np.argmax(

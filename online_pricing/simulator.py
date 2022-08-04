@@ -14,13 +14,18 @@ class Simulator(object):
         self.groups = range(3)
         self.__SocialInfluence = None
         self.environment = environment()
-        self.prices = [19.99, 16.7, 12.15, 8.0, 35.0]
+        self.prices = [
+            [*price_and_margins.keys()]
+            for price_and_margins in self.environment.prices_and_margins.values()
+        ]
+        self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
         # lambda to go to second secondary product
         self._lambda = 0.5
-        # daily data
-        self._daily_data = dict()
-        self._users_data = dict()
-        self.current_learner: Learner | None = None
+        self.learners: list[Learner] = [
+            TSLearner(n_arms=self.environment.n_products, prices=self.prices[idx])
+            for idx in range(self.environment.n_products)
+        ]
+        self.social_influence = SocialInfluence()
 
     def sim_one_day(self) -> None:
         """
@@ -35,7 +40,7 @@ class Simulator(object):
         """
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int, int] = [0] * self.environment.n_products
-        influence_matrix = [[0] * self.environment.n_products] * self.environment.n_products
+        influence_matrix: list[list[list[int]]] = []
 
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
@@ -44,11 +49,16 @@ class Simulator(object):
                     client_id=client_id,
                     product_id=primary_product,
                     product_graph=self.environment.distributions_parameters["product_graph"].copy(),
-                    prices=self.prices,
+                    prices=self.current_prices,
                 )
-                self.update_learner(buys)
                 products_sold = sum_by_element(products_sold, buys)
-                influence_matrix = sum_by_element(influence_matrix, influenced)
+
+                self.update_learners(buys=buys, prices=self.current_prices)
+                self.social_influence.add_episode(influenced)
+
+        # TODO: Add here Social Influence and Greedy Algorithm
+        # influence_matrix è il dataset lista di matrici di influenza
+        # products_sold è il totale dei prodotti venduti, forse non serve
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -63,6 +73,7 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
+        # TODO(Alfredo): Fixare questo metodo
         willing_price = self.environment.sample_demand_curve(group=group, prod_id=product_id)
         n_units = 0
         if price < willing_price:
@@ -130,30 +141,33 @@ class Simulator(object):
 
         return buys, influence_matrix
 
-    # TODO: might be per group
-    def update_learner(self, buys: list[int]) -> None:
+    def update_learners(self, buys: list[int], prices: list[float]) -> None:
         """
-        Update current learner with the buys of the user.
+        Update the learners with the buys of the user.
 
         The reward is 1 if the user bought a product, 0 otherwise.
 
         :param buys: list of number of units bought per product
+        :param prices: prices of the products
         """
+        arms_pulled = [
+            self.learners[idx].get_arm(prices[idx]) for idx in range(self.environment.n_products)
+        ]
         did_buy = [int(buy > 0) for buy in buys]
 
         for idx, bought in enumerate(did_buy):
-            self.current_learner.update(arm_pulled=idx, reward=bought)
+            self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
     def formula(self, alpha, conversion_rates, margins, influence_probability):
         s1 = 0
         s2 = 0
         sum = 0
-        for i in range(0,5):
-            s1 += conversion_rates[i]*margins[i]
-            for j in range(0,5):
+        for i in range(0, 5):
+            s1 += conversion_rates[i] * margins[i]
+            for j in range(0, 5):
                 if i != j:
-                    s2 += influence_probability[i][j]*conversion_rates[j]*margins[j]
-            sum = sum + alpha[i]*(s1 + s2)
+                    s2 += influence_probability[i][j] * conversion_rates[j] * margins[j]
+            sum = sum + alpha[i] * (s1 + s2)
             s2 = 0
             s1 = 0
         return sum
@@ -166,20 +180,24 @@ class Simulator(object):
         """
         pass
 
-    def greedy_algorithm(self, alpha, conversion_rates, margins, influence_probability):        #greedy alg without considering groups. Alpha il a list of 5 elements,
-        prices = [0, 0,0,0,0]                                                                    #conversion_rates and margins are matrix 5x4 (products x prices)
-        max = self.formula(alpha, conversion_rates[:,0], margins[:,0], influence_probability)   #influence_probability is a matrix 5x5 (products x products) where cell ij is the
-        while True:                                                                             #probability to go from i to j
+    def greedy_algorithm(
+        self, alpha, conversion_rates, margins, influence_probability
+    ):  # greedy alg without considering groups. Alpha il a list of 5 elements,
+        prices = [0, 0, 0, 0, 0]  # conversion_rates and margins are matrix 5x4 (products x prices)
+        max = self.formula(
+            alpha, conversion_rates[:, 0], margins[:, 0], influence_probability
+        )  # influence_probability is a matrix 5x5 (products x products) where cell ij is the
+        while True:  # probability to go from i to j
             changed = False
             best = prices
-            for i in range(0,5):
+            for i in range(0, 5):
                 temp = prices
                 cr = []
                 mr = []
                 temp[i] += 1
                 if temp[i] > 3:
                     temp[i] = 3
-                for j in range(0,5):
+                for j in range(0, 5):
                     cr.append(conversion_rates[j, temp[j]])
                     mr.append(margins[j, temp[j]])
                 n = self.formula(alpha, cr, mr, influence_probability)
@@ -192,42 +210,53 @@ class Simulator(object):
             if changed:
                 prices = best
 
-
     def formula_with_groups(self, list_alpha, conversion_rates, margins, influence_probability):
         s1 = 0
         s2 = 0
         sum = 0
-        for g in range (0,3):
-            for i in range(0,5):
-                s1 += conversion_rates[g][i]*margins[i]
-                for j in range(0,5):
+        for g in range(0, 3):
+            for i in range(0, 5):
+                s1 += conversion_rates[g][i] * margins[i]
+                for j in range(0, 5):
                     if i != j:
-                        s2 += influence_probability[i][j]*conversion_rates[g][j]*margins[j]
-                sum = sum + list_alpha[g][i]*(s1 + s2)
+                        s2 += influence_probability[i][j] * conversion_rates[g][j] * margins[j]
+                sum = sum + list_alpha[g][i] * (s1 + s2)
                 s2 = 0
                 s1 = 0
         return sum
 
-    def greedy_algorithm_with_groups(self, list_alpha, list_conversion_rates, margins, influence_probability):      #greedy algorithm considering groups. Same as before except for:
-        prices = [0,0,0,0,0]                                                                                        #list_alpha is a list of 3 lists where each list contains 5 elements
-        conversion_rates = []                                                                                       #list_conversion_rates is a list of 3 matrices where each matrix is 5x4 (products x prices)
-        for g in range(0,3):
-            conversion_rates.append(list_conversion_rates[g][:,0])
-        max = self.formula_with_groups(list_alpha, conversion_rates, margins[:,0], influence_probability)
+    def greedy_algorithm_with_groups(
+        self, list_alpha, list_conversion_rates, margins, influence_probability
+    ):  # greedy algorithm considering groups. Same as before except for:
+        prices = [
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]  # list_alpha is a list of 3 lists where each list contains 5 elements
+        conversion_rates = (
+            []
+        )  # list_conversion_rates is a list of 3 matrices where each matrix is 5x4 (products x prices)
+        for g in range(0, 3):
+            conversion_rates.append(list_conversion_rates[g][:, 0])
+        max = self.formula_with_groups(
+            list_alpha, conversion_rates, margins[:, 0], influence_probability
+        )
         while True:
             changed = False
             best = prices
-            for i in range(0,5):
+            for i in range(0, 5):
                 temp = prices
                 cr = [[0 for v in range(5)] for w in range(3)]
                 mr = []
                 temp[i] += 1
                 if temp[i] > 3:
                     temp[i] = 3
-                for g in range(0,3):
-                    for j in range(0,5):
+                for g in range(0, 3):
+                    for j in range(0, 5):
                         cr[g][j] = list_conversion_rates[g][j, temp[j]]
-                for k in range (0,5):
+                for k in range(0, 5):
                     mr.append(margins[k, temp[k]])
                 n = self.formula_with_groups(list_alpha, cr, mr, influence_probability)
                 if n > max:
@@ -238,116 +267,6 @@ class Simulator(object):
                 return best
             if changed:
                 prices = best
-
-
-
-
-
-    # TODO: here goes the greedy part of the simulation
-    # def sim_one_day_greedy(self):
-    #     # TODO define well social influence build matrix HERE
-    #     self.__SocialInfluence = SocialInfluence(self.environment.sample_n_users())
-    #     direct_clients = self.environment.get_direct_clients()
-    #
-    #     self._users_data = dict()
-    #     # Secondary products probability graph
-    #     product_graph = self.environment.distributions_parameters["product_graph"]
-    #     # Initial configuration
-    #     base_prices = [learner.act() for learner in self.environment.Learners]
-    #
-    #     # Users n_units bought per product
-    #     buys_dict = dict()
-    #
-    #     # Simulate buys for direct clients
-    #     for g in range(3):  # for each group
-    #         for client, product in direct_clients["group_" + str(g)]:  # for each product
-    #             buys_dict[client] = self.sim_one_user(
-    #                 group=g,
-    #                 client=client,
-    #                 product=product,
-    #                 product_graph=product_graph,
-    #                 prices=base_prices,
-    #             )
-    #
-    #     # We now see how these customers have influenced their contacts and simulate what happens to those
-    #     # they brought to our product websites
-    #     influenced_clients_prods: dict[str, int] = self.__SocialInfluence.simulate_influence(
-    #         self._users_data
-    #     )
-    #
-    #     # Simulate buys for indirect clients
-    #     for g in range(3):
-    #         for client, product in influenced_clients_prods.items():
-    #             buys_dict[client] = self.sim_one_user(
-    #                 group=g,
-    #                 client=client,
-    #                 product=product,
-    #                 product_graph=product_graph,
-    #                 prices=base_prices,
-    #             )
-    #
-    #     # Calculate reward for configuration based on n_units sold
-    #     max_cumulative_expected_margin = get_buys_reward(buys_dict, margins=[])
-    #
-    #     # New configurations
-    #     n_learners = 5
-    #     next_prices = [
-    #         [learner.act() for learner in self.environment.Learners] for _ in range(n_products)
-    #     ]
-    #     # Update only one learner per configuration
-    #     for new_idx in range(n_learners):
-    #         next_prices[new_idx][new_idx] = self.environment.Learners[new_idx].greedy_act()
-    #
-    #     # Index of bes configuration, if None terminate
-    #     best_update: int | None = None
-    #
-    #     # For each learner, re-test daily user
-    #     for idx in range(n_learners):
-    #         buys_dict = dict()
-    #         for g in range(3):
-    #             for client, product in direct_clients["group_" + str(g)]:  # for each webpage
-    #                 buys_dict[client] = self.sim_one_user(
-    #                     group=g,
-    #                     client=client,
-    #                     product=product,
-    #                     product_graph=product_graph,
-    #                     prices=base_prices,
-    #                 )
-    #             for client, product in influenced_clients_prods.items():
-    #                 buys_dict[client] = self.sim_one_user(
-    #                     group=g,
-    #                     client=client,
-    #                     product=product,
-    #                     product_graph=product_graph,
-    #                     prices=next_prices[idx],
-    #                 )
-    #
-    #         # Calculate reward
-    #         cumulative_expected_margin = get_buys_reward(buys_dict, margins=[])
-    #
-    #         # If better than initial_config/next_best_config
-    #         if cumulative_expected_margin > max_cumulative_expected_margin:
-    #             # Update best config
-    #             best_update = idx
-    #             max_cumulative_expected_margin = cumulative_expected_margin
-    #
-    #     # Return best config == learner index and reward
-    #     return best_update, max_cumulative_expected_margin
-    #
-    #
-    #
-    # def greedy_simulation(self, n_iterations: int = 365) -> None:
-    #     greedy_environment = GreedyEnvironment
-    #     simulator = Simulator(greedy_environment)
-    #     max_cumulative_expected_margin = 0
-    #
-    #     for t in range(n_iterations):
-    #         best_update, max_cumulative_expected_margin = simulator.sim_one_day_greedy()
-    #
-    #         if best_update is None:
-    #             return
-    #
-    #         greedy_environment.round(best_update, max_cumulative_expected_margin)
 
 
 def sum_by_element(array_1: list[Any], array_2: list[Any]) -> list[Any]:
