@@ -27,6 +27,9 @@ class Learner:
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
 
+    def sample_arm(self, arm_id):
+        return 0 # TODO
+
 
 class GreedyLearner(Learner):
     """Greedy learner.

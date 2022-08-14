@@ -26,7 +26,9 @@ class Simulator(object):
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence()
+        # estimate the matrix A (present in environment but not known)
         self.estimated_edge_probas = list()
+        self.secondaries: list[list] = [[0, 1, 2 ,0, 0],] # 1 first secondary, 2 second secondary, 0 not secondary
 
     def sim_one_day(self) -> None:
         """
@@ -57,9 +59,12 @@ class Simulator(object):
                 self.update_learners(buys=buys, prices=self.current_prices)
                 self.social_influence.add_episode(influenced)
 
+
         # TODO: Add here Social Influence and Greedy Algorithm
         # influence_matrix è il dataset lista di matrici di influenza
         # products_sold è il totale dei prodotti venduti, forse non serve
+        self.estimated_edge_probas = [self.social_influence.estimate_probabilities(i, n_products=5)
+                                      for i in range(5)]
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -74,9 +79,8 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
-        # TODO(Alfredo): Fixare questo metodo
         willing_price = self.environment.sample_demand_curve(group=group, prod_id=product_id, price=price,
-                                                             uncertain=False)
+                                                             uncertain=False)  # TODO filippo we could make one simulator per step
         n_units = 0
         if price < willing_price:
             n_units = self.environment.sample_quantity_bought(group)
@@ -141,6 +145,7 @@ class Simulator(object):
             buys = sum_by_element(buys, following_buys)
             influence_matrix = sum_by_element(influence_matrix, following_influence)
 
+        # TODO filippo self.social_influence.add_episode(...)
         return buys, influence_matrix
 
     def update_learners(self, buys: list[int], prices: list[float]) -> None:
@@ -174,12 +179,45 @@ class Simulator(object):
             s1 = 0
         return sum
 
-    def __influence_function(self, start_product, other_prod):
+    def __influence_function(self, i, j):
         """
-        Adjust for conversion rates and for the lambda (in case of second seconary product)
-        for every starting node in influence_probability
+        Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
+        def single_jump(i, j, first=False):
+            """
+            Helper function to obtain the proba we click a secondary product appearing to a
+            :param i: the product we have clicked
+            :param j: the product we0 potentially click
+            :param first: if it is the first secondary or not
+            :return: the probability we
+            """
+            return self.learners[i].sample_arm(np.argwhere(self.prices[i] == self.current_prices[i]))
+
+        def wrapper_second(i, j):
+            """
+            manages if it is secondary or not
+            :param i:
+            :param j:
+            :return:
+            """
+            if self.secondaries[i][j] == 2:
+                return self._lambda
+            elif self.secondaries[i][j] == 1:
+                return 1
+            else:
+                return 0
+
+        infl = 1
+        visited = list()
+
+        for jump in range(1,5): # number of jumps
+            if jump == 1:
+                infl *= self.estimated_edge_probas[i][j] * wrapper_second(i, j)
+            elif jump == 2:
+                pass
+
+
         pass
 
     def greedy_algorithm(

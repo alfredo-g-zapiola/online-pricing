@@ -11,14 +11,21 @@ from online_pricing.learner import GreedyLearner
 
 class EnvironmentBase:
     def __init__(self) -> None:
+
         self.n_products = 5
         self.n_groups = 3
-         # TODO ensure monotonicity and prices
-        self.prices_and_margins = { # TODO update
-            "echo_dot": {34: 0.05, 12: 4, 14: 5, 15: 2},  # TODO look at plot
-            "ring_chime": {36: 2, 12: 4, 14: 5, 15: 2},
-            "product_3": {25: 2, 12: 4, 14: 5, 15: 2},
-            "product_4": {25: 2, 12: 4, 14: 5, 15: 2},
+        """
+        Prices and margins: taken from the demand_curves.R we have the prices.
+        We assume the cost to be the 40% of the standard price, so that when there is 40% discount,
+        we break even (it would hardly make sense otherwise)
+        Note the margin decreases linearly with the price
+        """
+        self.prices_and_margins = {
+            "echo_dot": {34: 34-13, 32: 32-13, 27: 27-13, 13: 0},
+            "ring_chime": {36: 36-14.4, 34.2: 34.2-14.4, 28.8: 28.8-14.4, 14.4: 0},
+            "ring_f": {200: 200-80, 190: 190-80, 160: 160-80, 80: 0},
+            "ring_v": {60: 60-24, 57: 57-24, 48: 48-24, 24: 0},
+            "echo_show": {96: 96-38.4, 91.2: 91.2-38.4, 76.8: 76.8-38.4, 38.4:0}
         }
 
         # function parameters (can also be opened with a json)
@@ -34,11 +41,11 @@ class EnvironmentBase:
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    [0.0, 0.1, 0.2, 0.2, 0.0],
-                    [0.1, 0.0, 0.2, 0.3, 0.0],
-                    [0.2, 0.2, 0.0, 0.1, 0.0],
-                    [0.2, 0.3, 0.1, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.9, 0.8, 0.7, 0.6],
+                    [0.6, 0.0, 0.9, 0.8, 0.7],
+                    [0.7, 0.8, 0.0, 0.9, 0.8],
+                    [0.8, 0.7, 0.6, 0.0, 0.9],
+                    [0.9, 0.8, 0.7, 0.6, 0.0],
                 ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
@@ -184,7 +191,8 @@ class EnvironmentBase:
                         size=n_direct_clients[idx],
                         replace=False,
                     ),
-                    np.random.choice(range(self.n_products), n_direct_clients[idx]), # TODO add extra
+                    # note here -1 means the client goes to another website
+                    np.random.choice([-1] + list(range(self.n_products)), n_direct_clients[idx]),
                 )
             )
             for idx, n_group in enumerate(self.__n_users)
