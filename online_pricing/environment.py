@@ -2,7 +2,7 @@ from abc import abstractmethod
 
 import numpy as np
 
-# from scipy.stats import wishart
+# from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
@@ -13,7 +13,8 @@ class EnvironmentBase:
     def __init__(self) -> None:
         self.n_products = 5
         self.n_groups = 3
-        self.prices_and_margins = {
+         # TODO ensure monotonicity and prices
+        self.prices_and_margins = { # TODO update
             "echo_dot": {34: 0.05, 12: 4, 14: 5, 15: 2},  # TODO look at plot
             "ring_chime": {36: 2, 12: 4, 14: 5, 15: 2},
             "product_3": {25: 2, 12: 4, 14: 5, 15: 2},
@@ -170,6 +171,7 @@ class EnvironmentBase:
 
         :return: the direct clients with their primary product.
         """
+        # TODO add
         cumsum_clients = [0, *np.cumsum(self.__n_users)]
         # TODO: not uniform
         n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in self.__n_users]
@@ -182,7 +184,7 @@ class EnvironmentBase:
                         size=n_direct_clients[idx],
                         replace=False,
                     ),
-                    np.random.choice(range(self.n_products), n_direct_clients[idx]),
+                    np.random.choice(range(self.n_products), n_direct_clients[idx]), # TODO add extra
                 )
             )
             for idx, n_group in enumerate(self.__n_users)

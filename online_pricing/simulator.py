@@ -26,6 +26,7 @@ class Simulator(object):
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence()
+        self.estimated_edge_probas = list()
 
     def sim_one_day(self) -> None:
         """
@@ -39,8 +40,8 @@ class Simulator(object):
         along with the empirical influence matrix that records the jumps to secondary products.
         """
         direct_clients = self.environment.get_direct_clients()
+        # TODO aggiungere controllo id -1: altro sito web
         products_sold: list[int, int] = [0] * self.environment.n_products
-        influence_matrix: list[list[list[int]]] = []
 
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
@@ -74,7 +75,8 @@ class Simulator(object):
         :return: number of units bought
         """
         # TODO(Alfredo): Fixare questo metodo
-        willing_price = self.environment.sample_demand_curve(group=group, prod_id=product_id)
+        willing_price = self.environment.sample_demand_curve(group=group, prod_id=product_id, price=price,
+                                                             uncertain=False)
         n_units = 0
         if price < willing_price:
             n_units = self.environment.sample_quantity_bought(group)
@@ -172,7 +174,7 @@ class Simulator(object):
             s1 = 0
         return sum
 
-    def __wrap_influence_probability(self):
+    def __influence_function(self, start_product, other_prod):
         """
         Adjust for conversion rates and for the lambda (in case of second seconary product)
         for every starting node in influence_probability
