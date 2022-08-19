@@ -76,6 +76,7 @@ for (p in 1:5){
 }
 # margins calculation:
 # we assume 40% margin so that we never lose money
+
 # P1: ECHO dot
 #
 set.seed(23)

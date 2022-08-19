@@ -1,5 +1,6 @@
 import random
 from typing import Any, Type, TypeVar, Union
+import itertools
 
 import numpy as np
 
@@ -14,6 +15,7 @@ class Simulator(object):
         self.groups = range(3)
         self.__SocialInfluence = None
         self.environment = environment()
+        self.secondaries = self.environment.yield_first_secondaries()
         self.prices = [
             [*price_and_margins.keys()]
             for price_and_margins in self.environment.prices_and_margins.values()
@@ -28,7 +30,6 @@ class Simulator(object):
         self.social_influence = SocialInfluence()
         # estimate the matrix A (present in environment but not known)
         self.estimated_edge_probas = list()
-        self.secondaries: list[list] = [[0, 1, 2 ,0, 0],] # 1 first secondary, 2 second secondary, 0 not secondary
 
     def sim_one_day(self) -> None:
         """
@@ -179,7 +180,7 @@ class Simulator(object):
             s1 = 0
         return sum
 
-    def __influence_function(self, i, j):
+    def __influence_function(self, i, j, influence=0, history=np.array([], dtype=int)):
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
@@ -193,32 +194,50 @@ class Simulator(object):
             :return: the probability we
             """
             return self.learners[i].sample_arm(np.argwhere(self.prices[i] == self.current_prices[i]))
+        def c_rate(j):
+            return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
 
-        def wrapper_second(i, j):
-            """
-            manages if it is secondary or not
-            :param i:
-            :param j:
-            :return:
-            """
-            if self.secondaries[i][j] == 2:
-                return self._lambda
-            elif self.secondaries[i][j] == 1:
+        def assign_sec(k, l):
+            if self.secondaries[k][0] == l:
                 return 1
+            elif self.secondaries[k][1] == l:
+                return 2
             else:
                 return 0
 
-        infl = 1
-        visited = list()
+        first_sec = self.secondaries[i][0]
+        sec_sec = self.secondaries[i][1]
 
-        for jump in range(1,5): # number of jumps
-            if jump == 1:
-                infl *= self.estimated_edge_probas[i][j] * wrapper_second(i, j)
-            elif jump == 2:
-                pass
+        # all possible paths from index i to j (if j appears before other indices, we cut the path)
+        paths = [path for path in itertools.permutations([k for k in range(5) if i != k])]
+        influence = 0
+        for path in paths:
+            path_proba = 1
+            last_edge = i
+            for edge in path:
+                # if it is secondary
+                status = assign_sec(last_edge, edge)
+                if status > 0:
+                    if edge == j:
+                        path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
+                                      (self._lambda if status == 2 else 1)
+                        break   # finish the path
+
+                    else: # the edge is not a destination
+                        path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
+                                      (self._lambda if status == 2 else 1)
+                        last_edge = edge  # update the last edge
+                else:
+                    path_proba *= 0 # infeasible
+                    break  # go to next path
+            influence += path_proba
 
 
-        pass
+
+
+
+
+
 
     def greedy_algorithm(
         self, alpha, conversion_rates, margins, influence_probability

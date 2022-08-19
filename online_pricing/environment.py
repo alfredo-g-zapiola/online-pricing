@@ -1,5 +1,3 @@
-from abc import abstractmethod
-
 import numpy as np
 
 # from scipy.stats import wishart # for step 5: uncertain graph weights
@@ -41,11 +39,11 @@ class EnvironmentBase:
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    [0.0, 0.9, 0.8, 0.7, 0.6],
-                    [0.6, 0.0, 0.9, 0.8, 0.7],
-                    [0.7, 0.8, 0.0, 0.9, 0.8],
-                    [0.8, 0.7, 0.6, 0.0, 0.9],
-                    [0.9, 0.8, 0.7, 0.6, 0.0],
+                    [0.0, 0.9, 0.9**2, 0.9**3, 0.9**4],
+                    [0.9**4, 0.0, 0.9, 0.9**2, 0.9**3],
+                    [0.9**4, 0.9**3, 0.0, 0.9, 0.9**2],
+                    [0.9**2, 0.9**3, 0.9**4, 0.0, 0.9],
+                    [0.9, 0.9**2, 0.9**3, 0.9**4, 0.0],
                 ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
@@ -211,13 +209,22 @@ class EnvironmentBase:
         else:
             return m
 
-        def compute_clairvoyant(self):
-            """
-            Finds the optimal superarm that maximises the utility gains
-            :param self:
-            :return: optimital superarm
-            """
-            return list()
+    def compute_clairvoyant(self):
+        """
+        Finds the optimal superarm that maximises the utility gains
+        :param self:
+        :return: optimital superarm
+        """
+        return list()
+
+    def yield_first_secondaries(self):
+        """
+        Sends to the simulator the two best products to be the secondaries.
+
+        :return: A list of n_products where for each product we have the two secondaries
+        """
+        return [np.flip(np.argsort(self.distributions_parameters["product_graph"][i]))[:2] for i in range(self.n_products)]
+
 
 
 class GreedyEnvironment(EnvironmentBase):
