@@ -185,15 +185,6 @@ class Simulator(object):
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
-        def single_jump(i, j, first=False):
-            """
-            Helper function to obtain the proba we click a secondary product appearing to a
-            :param i: the product we have clicked
-            :param j: the product we0 potentially click
-            :param first: if it is the first secondary or not
-            :return: the probability we
-            """
-            return self.learners[i].sample_arm(np.argwhere(self.prices[i] == self.current_prices[i]))
         def c_rate(j):
             return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
 
@@ -205,11 +196,9 @@ class Simulator(object):
             else:
                 return 0
 
-        first_sec = self.secondaries[i][0]
-        sec_sec = self.secondaries[i][1]
-
         # all possible paths from index i to j (if j appears before other indices, we cut the path)
         paths = [path for path in itertools.permutations([k for k in range(5) if i != k])]
+
         influence = 0
         for path in paths:
             path_proba = 1
@@ -217,18 +206,18 @@ class Simulator(object):
             for edge in path:
                 # if it is secondary
                 status = assign_sec(last_edge, edge)
-                if status > 0:
+                if status > 0:  # if it appears as a secondary
                     if edge == j:
                         path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
                         break   # finish the path
 
-                    else: # the edge is not a destination
+                    else:  # the edge is not a destination
                         path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
                         last_edge = edge  # update the last edge
                 else:
-                    path_proba *= 0 # infeasible
+                    path_proba *= 0  # infeasible: this product cannot be reached directly from last_edge
                     break  # go to next path
             influence += path_proba
 
