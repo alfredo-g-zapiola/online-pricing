@@ -225,28 +225,28 @@ class Simulator(object):
 
     def greedy_algorithm(
         self, conversion_rates, margins, influence_probability
-    ):  # greedy alg without considering groups. Alpha il a list of 5 elements,
+    ):  # greedy alg without considering groups. Alpha is a list of 5 elements,
         prices = [0, 0, 0, 0, 0]  # conversion_rates and margins are matrix 5x4 (products x prices)
         max = self.formula(
             self.alpha, conversion_rates[:, 0], margins[:, 0], influence_probability
         )  # influence_probability is a matrix 5x5 (products x products) where cell ij is the
         while True:  # probability to go from i to j
             changed = False
-            best = prices
+            best = prices           #best configuration
             for i in range(0, 5):
-                temp = prices
-                cr = []
-                mr = []
-                temp[i] += 1
+                temp = prices       #new configuration where it is incremented the price of a product
+                cr = []             #list of 5 conversion rates, one for each product, to pass to the formula
+                mr = []             #list of 5 margins, one for each product, to pass to the formula
+                temp[i] += 1        #one price is incremented
                 if temp[i] > 3:
-                    temp[i] = 3
+                    temp[i] = 3     #there are max 4 prices
                 for j in range(0, 5):
-                    cr.append(conversion_rates[j, temp[j]])
-                    mr.append(margins[j, temp[j]])
+                    cr.append(conversion_rates[j, temp[j]])     #for each product j, I obtain its conversion rate knowing its price in temp[j]
+                    mr.append(margins[j, temp[j]])              #for each product j, I obtain its margin knowing its price in temp[j]
                 n = self.formula(self.alpha, cr, mr, influence_probability)
                 if n > max:
                     max = n
-                    best = temp
+                    best = temp     #save the best configuration
                     changed = True
             if not changed:
                 return best
@@ -284,27 +284,27 @@ class Simulator(object):
         for g in range(0, 3):
             conversion_rates.append(list_conversion_rates[g][:, 0])
         max = self.formula_with_groups(
-            list_alpha, conversion_rates, margins[:, 0], influence_probability
+            list_alpha, conversion_rates, margins[:, 0], influence_probability      #compute the value for the configuration 0,0,0,0,0
         )
         while True:
             changed = False
-            best = prices
+            best = prices                                           #best configuration
             for i in range(0, 5):
-                temp = prices
-                cr = [[0 for v in range(5)] for w in range(3)]
-                mr = []
-                temp[i] += 1
+                temp = prices                                       #new configuration where it is incremented the price of a product
+                cr = [[0 for v in range(5)] for w in range(3)]      #3 lists containining 5 conversion rates, one for each product in each group, to pass to the formula
+                mr = []                                             #3 lists containining 5 margins, one for each product in each group, to pass to the formula
+                temp[i] += 1                                        #one price is incremented
                 if temp[i] > 3:
-                    temp[i] = 3
+                    temp[i] = 3                                     #there are max 4 prices
                 for g in range(0, 3):
                     for j in range(0, 5):
-                        cr[g][j] = list_conversion_rates[g][j, temp[j]]
+                        cr[g][j] = list_conversion_rates[g][j, temp[j]]                 #for each product j in group g, I obtain its conversion rate knowing its price in temp[j]
                 for k in range(0, 5):
-                    mr.append(margins[k, temp[k]])
+                    mr.append(margins[k, temp[k]])                                      #for each product j in group g, I obtain its margin knowing its price in temp[j]
                 n = self.formula_with_groups(list_alpha, cr, mr, influence_probability)
                 if n > max:
                     max = n
-                    best = temp
+                    best = temp                                      #save the best configuration
                     changed = True
             if not changed:
                 return best
