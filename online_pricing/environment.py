@@ -4,9 +4,6 @@ import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
-from online_pricing.learner import GreedyLearner
-
-
 class EnvironmentBase:
     def __init__(self) -> None:
 
@@ -224,22 +221,6 @@ class EnvironmentBase:
         :return: A list of n_products where for each product we have the two secondaries
         """
         return [np.flip(np.argsort(self.distributions_parameters["product_graph"][i]))[:2] for i in range(self.n_products)]
-
-
-
-class GreedyEnvironment(EnvironmentBase):
-    def __init__(self) -> None:
-        super().__init__()
-        # create the list of learners, one for each product
-        self.learners = [
-            GreedyLearner(
-                n_arms=4, prices=list(self.prices_and_margins["product_" + str(i)].values())
-            )
-            for i in range(self.n_products)
-        ]  # first configuration [0, 0, 0, 0, 0]
-
-    def round(self, best_update: int, reward: int):
-        self.learners[best_update].update(self.learners[best_update].act(), reward)
 
 
 class EnvironmentStep4(EnvironmentBase):

@@ -1,10 +1,10 @@
 import random
-from typing import Any, Type, TypeVar, Union
+from typing import Any, Type
 import itertools
 
 import numpy as np
 
-from online_pricing.environment import EnvironmentBase, GreedyEnvironment
+from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 
@@ -16,6 +16,7 @@ class Simulator(object):
         self.__SocialInfluence = None
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
+        self.alpha = self.environment.yield_alpha() # TODO alfredo
         self.prices = [
             [*price_and_margins.keys()]
             for price_and_margins in self.environment.prices_and_margins.values()
@@ -180,13 +181,14 @@ class Simulator(object):
             s1 = 0
         return sum
 
-    def __influence_function(self, i, j, influence=0, history=np.array([], dtype=int)):
+    def c_rate(self, j):
+        return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
+
+    def __influence_function(self, i, j):
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
-        def c_rate(j):
-            return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
 
         def assign_sec(k, l):
             if self.secondaries[k][0] == l:
@@ -208,12 +210,12 @@ class Simulator(object):
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
                     if edge == j:
-                        path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
+                        path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
                         break   # finish the path
 
                     else:  # the edge is not a destination
-                        path_proba *= c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
+                        path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
                         last_edge = edge  # update the last edge
                 else:
@@ -221,19 +223,12 @@ class Simulator(object):
                     break  # go to next path
             influence += path_proba
 
-
-
-
-
-
-
-
     def greedy_algorithm(
-        self, alpha, conversion_rates, margins, influence_probability
+        self, conversion_rates, margins, influence_probability
     ):  # greedy alg without considering groups. Alpha il a list of 5 elements,
         prices = [0, 0, 0, 0, 0]  # conversion_rates and margins are matrix 5x4 (products x prices)
         max = self.formula(
-            alpha, conversion_rates[:, 0], margins[:, 0], influence_probability
+            self.alpha, conversion_rates[:, 0], margins[:, 0], influence_probability
         )  # influence_probability is a matrix 5x5 (products x products) where cell ij is the
         while True:  # probability to go from i to j
             changed = False
@@ -248,7 +243,7 @@ class Simulator(object):
                 for j in range(0, 5):
                     cr.append(conversion_rates[j, temp[j]])
                     mr.append(margins[j, temp[j]])
-                n = self.formula(alpha, cr, mr, influence_probability)
+                n = self.formula(self.alpha, cr, mr, influence_probability)
                 if n > max:
                     max = n
                     best = temp
