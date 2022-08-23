@@ -28,7 +28,7 @@ class Learner:
         return self.prices.index(price)
 
     def sample_arm(self, arm_id):
-        return 1 # TODO
+        return 1  # TODO
 
 
 class GreedyLearner(Learner):

@@ -3,6 +3,7 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
+
 class SocialInfluence:
     def __init__(self, n_products=5, n_episodes: int = 5, n_steps_max: int = 10):
         self.n_episodes = n_episodes
@@ -72,6 +73,7 @@ class SocialInfluence:
         estimated_prob = credit / occurr_v_active
         estimated_prob = np.nan_to_num(estimated_prob)
         return estimated_prob
+
     #
     # def __test(self):
     #     n_products = 5

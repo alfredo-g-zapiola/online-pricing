@@ -4,6 +4,7 @@ import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
+
 class EnvironmentBase:
     def __init__(self) -> None:
 
@@ -16,31 +17,31 @@ class EnvironmentBase:
         Note the margin decreases linearly with the price
         """
         self.prices_and_margins = {
-            "echo_dot": {34: 34-13, 32: 32-13, 27: 27-13, 13: 0},
-            "ring_chime": {36: 36-14.4, 34.2: 34.2-14.4, 28.8: 28.8-14.4, 14.4: 0},
-            "ring_f": {200: 200-80, 190: 190-80, 160: 160-80, 80: 0},
-            "ring_v": {60: 60-24, 57: 57-24, 48: 48-24, 24: 0},
-            "echo_show": {96: 96-38.4, 91.2: 91.2-38.4, 76.8: 76.8-38.4, 38.4:0}
+            "echo_dot": {34: 34 - 13, 32: 32 - 13, 27: 27 - 13, 13: 0},
+            "ring_chime": {36: 36 - 14.4, 34.2: 34.2 - 14.4, 28.8: 28.8 - 14.4, 14.4: 0},
+            "ring_f": {200: 200 - 80, 190: 190 - 80, 160: 160 - 80, 80: 0},
+            "ring_v": {60: 60 - 24, 57: 57 - 24, 48: 48 - 24, 24: 0},
+            "echo_show": {96: 96 - 38.4, 91.2: 91.2 - 38.4, 76.8: 76.8 - 38.4, 38.4: 0},
         }
 
         # function parameters (can also be opened with a json)
         self.distributions_parameters = {
-            "n_people_params": [70, 50,  20], # we have more poor people than rich people
+            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
             "dirichlet_params": [  # TODO dobbiamo giustificare le scelte qui
                 np.asarray([7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117]),
                 np.asarray([14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728]),
                 np.asarray([12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984]),
             ],
             # for the quantity chosen daily we have a ... distribution
-            "quantity_demanded_params": [1,  2,  3],
+            "quantity_demanded_params": [1, 2, 3],
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    [0.0] + np.random.uniform(.8,1,4),
-                    np.random.uniform(.8,1,1) +[0.] + np.random.uniform(.8,1,3),
-                    np.random.uniform(.8,1,2) +[0.] + np.random.uniform(.8,1,2),
-                    np.random.uniform(.8,1,3) +[0.] + np.random.uniform(.8,1,1),
-                    np.random.uniform(.8, 1, 4) + [0.],
+                    [0.0] + np.random.uniform(0.8, 1, 4),
+                    np.random.uniform(0.8, 1, 1) + [0.0] + np.random.uniform(0.8, 1, 3),
+                    np.random.uniform(0.8, 1, 2) + [0.0] + np.random.uniform(0.8, 1, 2),
+                    np.random.uniform(0.8, 1, 3) + [0.0] + np.random.uniform(0.8, 1, 1),
+                    np.random.uniform(0.8, 1, 4) + [0.0],
                 ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
@@ -221,7 +222,10 @@ class EnvironmentBase:
 
         :return: A list of n_products where for each product we have the two secondaries
         """
-        return [np.flip(np.argsort(self.distributions_parameters["product_graph"][i]))[:2] for i in range(self.n_products)]
+        return [
+            np.flip(np.argsort(self.distributions_parameters["product_graph"][i]))[:2]
+            for i in range(self.n_products)
+        ]
 
     def yield_expected_alpha(self, context_generation=False):
         """
@@ -232,9 +236,17 @@ class EnvironmentBase:
         """
         if not context_generation:
             # return the weighted mean (according to the number of people in the group) of the alpha ratios
-            return sum(np.asarray([self.distributions_parameters["n_people_params"][i]\
-                        * self.distributions_parameters["dirichlet_params"][i] for i in range(self.n_groups)]))\
-                   / sum([self.distributions_parameters["n_people_params"][i] for i in range (self.n_groups)])
+            return sum(
+                np.asarray(
+                    [
+                        self.distributions_parameters["n_people_params"][i]
+                        * self.distributions_parameters["dirichlet_params"][i]
+                        for i in range(self.n_groups)
+                    ]
+                )
+            ) / sum(
+                [self.distributions_parameters["n_people_params"][i] for i in range(self.n_groups)]
+            )
         else:
             return self.distributions_parameters["dirichlet_params"]
 

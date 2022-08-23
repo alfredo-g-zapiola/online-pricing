@@ -1,7 +1,7 @@
 import random
 from typing import Any, Type
 import itertools
-
+from collections import deque, namedtuple
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase
@@ -16,13 +16,17 @@ class Simulator(object):
         self.__SocialInfluence = None
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
-        self.expected_alpha_r = self.environment.yield_expected_alpha(context_generation=False) # set to True in step 7
+        self.expected_alpha_r = self.environment.yield_expected_alpha(
+            context_generation=False
+        )  # set to True in step 7
         self.prices = [
             [*price_and_margins.keys()]
             for price_and_margins in self.environment.prices_and_margins.values()
         ]
         # start with lowest prices
-        self.current_prices = [np.min(self.prices[idx]) for idx in range(self.environment.n_products)]
+        self.current_prices = [
+            np.min(self.prices[idx]) for idx in range(self.environment.n_products)
+        ]
         # lambda to go to second secondary product
         self._lambda = 0.5
         self.learners: list[Learner] = [
@@ -32,8 +36,10 @@ class Simulator(object):
         self.social_influence = SocialInfluence()
         # estimate the matrix A (present in environment but not known)
         # TODO this should be updated, initialisation not required
-        self.estimated_edge_probas = [np.random.uniform(size=5) * [1 if j in self.secondaries[i] else 0 for j in range(5)]
-                                      for i in range(self.environment.n_products)]
+        self.estimated_edge_probas = [
+            np.random.uniform(size=5) * [1 if j in self.secondaries[i] else 0 for j in range(5)]
+            for i in range(self.environment.n_products)
+        ]
 
     def sim_one_day(self) -> None:
         """
@@ -52,24 +58,21 @@ class Simulator(object):
 
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
-                buys, influenced = self.sim_one_user(
+                buys, influenced_episodes = self.sim_one_user(
                     group=group,
-                    client_id=client_id,
-                    product_id=primary_product,
+                    landing_product=primary_product,
                     product_graph=self.environment.distributions_parameters["product_graph"].copy(),
                     prices=self.current_prices,
                 )
                 products_sold = sum_by_element(products_sold, buys)
 
                 self.update_learners(buys=buys, prices=self.current_prices)
-                self.social_influence.add_episode(influenced)
-
+                self.social_influence.add_episode(influenced_episodes)
 
         # TODO: Add here Social Influence and Greedy Algorithm
-        # influence_matrix è il dataset lista di matrici di influenza
-        # products_sold è il totale dei prodotti venduti, forse non serve
-        self.estimated_edge_probas = [self.social_influence.estimate_probabilities(i, n_products=5)
-                                      for i in range(5)]
+        self.estimated_edge_probas = [
+            self.social_influence.estimate_probabilities(i, n_products=5) for i in range(5)
+        ]
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -84,8 +87,9 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
-        willing_price = self.environment.sample_demand_curve(group=group, prod_id=product_id, price=price,
-                                                             uncertain=False)  # TODO filippo we could make one simulator per step
+        willing_price = self.environment.sample_demand_curve(
+            group=group, prod_id=product_id, price=price, uncertain=False
+        )  # TODO filippo we could make one simulator per step
         n_units = 0
         if price < willing_price:
             n_units = self.environment.sample_quantity_bought(group)
@@ -93,65 +97,66 @@ class Simulator(object):
         return n_units
 
     def sim_one_user(
-        self, group: int, client_id: int, product_id: int, product_graph: Any, prices: list[float]
+        self, group: int, landing_product: int, product_graph: Any, prices: list[float]
     ) -> tuple[list[int], list[list[int]]]:
         """
         Function to simulate the behavior of a single user.
 
-        A user may start from a primary product and then buy secondary products. Next, for each
-        secondary product, he may buy a number of units and interact with other secondary products.
-        This is done recursively while updating the product_graph matrix to remove cycles.
-        The secondary products are chosen based on the product_graph matrix, using the most
-        probable product to be bought. This is product is fixed and selected clairvoyantly by an
-        external company. In the end, an array with the number of units bought per product is
-        returned, along with the influence matrix.
+        A user may start from a primary product and then buy secondary products. This behaviour
+        is implemented through a Breadth First Search algorithm. If a user buys a primary product,
+        he will then choose to enter the secondary products. Each secondary product is associated with a probability
+        to "click on it". If the user clicks on a secondary product, he will then choose to buy it if the price is
+        interesting. When no more products are available, the iteration will end.
 
         :param group: group of the user
-        :param client_id: id of the user
-        :param product_id: product to simulate the behavior of the user
+        :param landing_product: landing product id
         :param product_graph: secondary product probability graph
         :param prices: prices of the products
         :return: list of number of units bought per product and the influencing matrix
         """
-        # Instantiate buys and influence matrix
-        buys: list[int] = [
-            0 if idx != product_id else self.sim_buy(group, product_id, prices[product_id])
-            for idx in range(self.environment.n_products)
-        ]
-        influence_matrix = [[0] * self.environment.n_products] * self.environment.n_products
+        # Instantiate buys and influence episodes
+        buys: list[int] = [0] * self.environment.n_products
+        visited: list[int] = [0] * self.environment.n_products
+        influence_episodes = []
 
-        # If user didn't buy primary_product, return
-        if not buys[product_id]:
-            return buys, influence_matrix
+        # Data structure that represent every node of the graph and a probability that the user will enter it
+        VisitingNode = namedtuple("VisitingNode", ["product_id", "probability"])
 
-        # Remove cycles
-        product_graph[:, product_id] = 0
+        # Initialize the queue with the landing product, it has a probability of 1 to be seen
+        visiting_que = deque()
+        visiting_que.append(VisitingNode(product_id=landing_product, probability=1))
 
-        # Argmax of probabilities
-        first_advised = np.argsort(product_graph[product_id])[-1]
-        if random.random() < product_graph[product_id][first_advised]:
-            # Update influence matrix with the current jump
-            influence_matrix[product_id][first_advised] += 1
-            # Simulate recursively
-            following_buys, following_influence = self.sim_one_user(
-                group, client_id, first_advised, product_graph, prices
-            )
-            # Update buys and influence matrix from recursive call
-            buys = sum_by_element(buys, following_buys)
-            influence_matrix = sum_by_element(influence_matrix, following_influence)
+        while visiting_que:
+            current_node = visiting_que.pop()
+            product_id = current_node.product_id
+            visited[product_id] = 1
 
-        # Do the same with the second secondary product
-        second_advised = np.argsort(product_graph[product_id])[-2]
-        if random.random() < product_graph[product_id][second_advised] * self._lambda:
-            influence_matrix[product_id][second_advised] += 1
-            following_buys, following_influence = self.sim_one_user(
-                group, client_id, second_advised, product_graph, prices
-            )
-            buys = sum_by_element(buys, following_buys)
-            influence_matrix = sum_by_element(influence_matrix, following_influence)
+            # If the user clicks on it
+            if random.random() <= current_node.probability and not visited[product_id]:
+                # Simulate the buy of the product and update records
+                buys[product_id] = self.sim_buy(group, product_id, prices[product_id])
+                influence_episodes.append(
+                    [0 if idx != product_id else 1 for idx in range(self.environment.n_products)]
+                )
 
-        # TODO filippo self.social_influence.add_episode(...)
-        return buys, influence_matrix
+                # If the user bought something, we unlock the secondary products
+                if buys[product_id]:
+                    # Add the first advised to the queue
+                    first_advised = (self.secondaries[product_id].primary,)
+                    first_probability = product_graph[product_id][first_advised]
+                    visiting_que.append(
+                        VisitingNode(product_id=first_advised, probability=first_probability)
+                    )
+
+                    # Add the second advised to the queue
+                    second_advised = self.secondaries[product_id].secondary
+                    second_probability = product_graph[product_id][second_advised] * self._lambda
+                    visiting_que.append(
+                        VisitingNode(product_id=second_advised, probability=second_probability)
+                    )
+
+        # Return history records
+        return buys, influence_episodes
 
     def update_learners(self, buys: list[int], prices: list[float]) -> None:
         """
@@ -215,8 +220,11 @@ class Simulator(object):
                 print("Path proba ", path_proba)
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
-                    cur_jump_proba = self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][edge] *\
-                                      (self._lambda if status == 2 else 1)
+                    cur_jump_proba = (
+                        self.c_rate(last_edge)
+                        * self.estimated_edge_probas[last_edge][edge]
+                        * (self._lambda if status == 2 else 1)
+                    )
                     if edge == j:
 
                         path_proba *= cur_jump_proba
@@ -226,17 +234,18 @@ class Simulator(object):
                             print("Already visited")
                         histories.append(history)
                         print("History: ", history, "\nprobability: ", path_proba, "\n")
-                        break   # finish the path
+                        break  # finish the path
 
                     else:  # the edge is not a destination
                         path_proba *= cur_jump_proba
                         last_edge = edge  # update the last edge
                         history.append(edge)
                 else:
-                    path_proba *= 0  # infeasible: this product cannot be reached directly from last_edge
+                    path_proba *= (
+                        0  # infeasible: this product cannot be reached directly from last_edge
+                    )
                     print("Infeasible. History: ", history, "\nprobability: ", path_proba, "\n")
                     break  # go to next path
-
 
             influence += path_proba
         return influence
@@ -250,21 +259,25 @@ class Simulator(object):
         )  # influence_probability is a matrix 5x5 (products x products) where cell ij is the
         while True:  # probability to go from i to j
             changed = False
-            best = prices           #best configuration
+            best = prices  # best configuration
             for i in range(0, 5):
-                temp = prices       #new configuration where it is incremented the price of a product
-                cr = []             #list of 5 conversion rates, one for each product, to pass to the formula
-                mr = []             #list of 5 margins, one for each product, to pass to the formula
-                temp[i] += 1        #one price is incremented
+                temp = prices  # new configuration where it is incremented the price of a product
+                cr = []  # list of 5 conversion rates, one for each product, to pass to the formula
+                mr = []  # list of 5 margins, one for each product, to pass to the formula
+                temp[i] += 1  # one price is incremented
                 if temp[i] > 3:
-                    temp[i] = 3     #there are max 4 prices
+                    temp[i] = 3  # there are max 4 prices
                 for j in range(0, 5):
-                    cr.append(conversion_rates[j, temp[j]])     #for each product j, I obtain its conversion rate knowing its price in temp[j]
-                    mr.append(margins[j, temp[j]])              #for each product j, I obtain its margin knowing its price in temp[j]
+                    cr.append(
+                        conversion_rates[j, temp[j]]
+                    )  # for each product j, I obtain its conversion rate knowing its price in temp[j]
+                    mr.append(
+                        margins[j, temp[j]]
+                    )  # for each product j, I obtain its margin knowing its price in temp[j]
                 n = self.formula(self.alpha, cr, mr, influence_probability)
                 if n > max:
                     max = n
-                    best = temp     #save the best configuration
+                    best = temp  # save the best configuration
                     changed = True
             if not changed:
                 return best
@@ -302,27 +315,38 @@ class Simulator(object):
         for g in range(0, 3):
             conversion_rates.append(list_conversion_rates[g][:, 0])
         max = self.formula_with_groups(
-            list_alpha, conversion_rates, margins[:, 0], influence_probability      #compute the value for the configuration 0,0,0,0,0
+            list_alpha,
+            conversion_rates,
+            margins[:, 0],
+            influence_probability,  # compute the value for the configuration 0,0,0,0,0
         )
         while True:
             changed = False
-            best = prices                                           #best configuration
+            best = prices  # best configuration
             for i in range(0, 5):
-                temp = prices                                       #new configuration where it is incremented the price of a product
-                cr = [[0 for v in range(5)] for w in range(3)]      #3 lists containining 5 conversion rates, one for each product in each group, to pass to the formula
-                mr = []                                             #3 lists containining 5 margins, one for each product in each group, to pass to the formula
-                temp[i] += 1                                        #one price is incremented
+                temp = prices  # new configuration where it is incremented the price of a product
+                cr = [
+                    [0 for v in range(5)] for w in range(3)
+                ]  # 3 lists containining 5 conversion rates, one for each product in each group, to pass to the formula
+                mr = (
+                    []
+                )  # 3 lists containining 5 margins, one for each product in each group, to pass to the formula
+                temp[i] += 1  # one price is incremented
                 if temp[i] > 3:
-                    temp[i] = 3                                     #there are max 4 prices
+                    temp[i] = 3  # there are max 4 prices
                 for g in range(0, 3):
                     for j in range(0, 5):
-                        cr[g][j] = list_conversion_rates[g][j, temp[j]]                 #for each product j in group g, I obtain its conversion rate knowing its price in temp[j]
+                        cr[g][j] = list_conversion_rates[g][
+                            j, temp[j]
+                        ]  # for each product j in group g, I obtain its conversion rate knowing its price in temp[j]
                 for k in range(0, 5):
-                    mr.append(margins[k, temp[k]])                                      #for each product j in group g, I obtain its margin knowing its price in temp[j]
+                    mr.append(
+                        margins[k, temp[k]]
+                    )  # for each product j in group g, I obtain its margin knowing its price in temp[j]
                 n = self.formula_with_groups(list_alpha, cr, mr, influence_probability)
                 if n > max:
                     max = n
-                    best = temp                                      #save the best configuration
+                    best = temp  # save the best configuration
                     changed = True
             if not changed:
                 return best
