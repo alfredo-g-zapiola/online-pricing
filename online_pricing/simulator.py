@@ -204,6 +204,7 @@ class Simulator(object):
         # all possible paths from index i to j (if j appears before other indices, we cut the path)
         paths = [path for path in itertools.permutations([k for k in range(5) if i != k])]
         influence = 0
+        histories = []
         for path in paths:
             print("Current path: ", path)
             path_proba = 1
@@ -211,23 +212,32 @@ class Simulator(object):
             history = [last_edge]
             for edge in path:
                 # if it is secondary
+                print("Path proba ", path_proba)
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
-                    if edge == j:
-                        path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
+                    cur_jump_proba = self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][edge] *\
                                       (self._lambda if status == 2 else 1)
-                        print("History: ", history, "\nprobability: ", path_proba)
+                    if edge == j:
+
+                        path_proba *= cur_jump_proba
+
+                        if history in histories:  # avoid repetitions
+                            path_proba *= 0
+                            print("Already visited")
+                        histories.append(history)
+                        print("History: ", history, "\nprobability: ", path_proba, "\n")
                         break   # finish the path
 
                     else:  # the edge is not a destination
-                        path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
-                                      (self._lambda if status == 2 else 1)
+                        path_proba *= cur_jump_proba
                         last_edge = edge  # update the last edge
                         history.append(edge)
                 else:
                     path_proba *= 0  # infeasible: this product cannot be reached directly from last_edge
-                    print("History: ", history, "\nprobability: ", path_proba)
+                    print("Infeasible. History: ", history, "\nprobability: ", path_proba, "\n")
                     break  # go to next path
+
+
             influence += path_proba
         return influence
 
