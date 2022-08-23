@@ -25,14 +25,14 @@ class EnvironmentBase:
 
         # function parameters (can also be opened with a json)
         self.distributions_parameters = {
-            "n_people_params": {"group_0": 50, "group_1": 20, "group_2": 70},
-            "dirichlet_params": {  # TODO dobbiamo giustificare le scelte qui
-                "group 0": (7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117),
-                "group 1": (14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728),
-                "group 3": (12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984),
-            },
+            "n_people_params": [ 70, 50,  20], # we have more poor people than rich people
+            "dirichlet_params": [  # TODO dobbiamo giustificare le scelte qui
+                (7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117),
+                (14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728),
+                (12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984),
+            ],
             # for the quantity chosen daily we have a ... distribution
-            "quantity_demanded_params": {"group 0": 1, "group 1": 2, "group 3": 3},
+            "quantity_demanded_params": [1,  2,  3],
             # product graph probabilities
             "product_graph": np.array(
                 [
@@ -221,6 +221,21 @@ class EnvironmentBase:
         :return: A list of n_products where for each product we have the two secondaries
         """
         return [np.flip(np.argsort(self.distributions_parameters["product_graph"][i]))[:2] for i in range(self.n_products)]
+
+    def yield_expected_alpha(self, context_generation=False):
+        """
+        It is assumed the simulator knows the expected values of the alpha ratios.
+
+        :return: an array of the expected values of the five alpha ratios. If we assume a unique group,
+        the weighted mean (according to the mean daily customers) is obtained
+        """
+        if not context_generation:
+            # return the weighted mean (according to the number of people in the group) of the alpha ratios
+            return sum([self.distributions_parameters["n_people_params"][i]\
+                        * self.distributions_parameters["dirichlet_params"][i] for i in range(self.n_groups)])\
+                   /self.n_groups
+        else:
+            return self.distributions_parameters["dirichlet_params"]
 
 
 class EnvironmentStep4(EnvironmentBase):
