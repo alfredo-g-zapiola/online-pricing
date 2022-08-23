@@ -25,11 +25,11 @@ class EnvironmentBase:
 
         # function parameters (can also be opened with a json)
         self.distributions_parameters = {
-            "n_people_params": [ 70, 50,  20], # we have more poor people than rich people
+            "n_people_params": [70, 50,  20], # we have more poor people than rich people
             "dirichlet_params": [  # TODO dobbiamo giustificare le scelte qui
-                (7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117),
-                (14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728),
-                (12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984),
+                np.asarray([7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117]),
+                np.asarray([14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728]),
+                np.asarray([12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984]),
             ],
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1,  2,  3],
@@ -212,7 +212,8 @@ class EnvironmentBase:
         :param self:
         :return: optimital superarm
         """
-        return list()
+        clairvoyant = 100
+        return clairvoyant
 
     def yield_first_secondaries(self):
         """
@@ -231,9 +232,9 @@ class EnvironmentBase:
         """
         if not context_generation:
             # return the weighted mean (according to the number of people in the group) of the alpha ratios
-            return sum([self.distributions_parameters["n_people_params"][i]\
-                        * self.distributions_parameters["dirichlet_params"][i] for i in range(self.n_groups)])\
-                   /self.n_groups
+            return sum(np.asarray([self.distributions_parameters["n_people_params"][i]\
+                        * self.distributions_parameters["dirichlet_params"][i] for i in range(self.n_groups)]))\
+                   / sum([self.distributions_parameters["n_people_params"][i] for i in range (self.n_groups)])
         else:
             return self.distributions_parameters["dirichlet_params"]
 

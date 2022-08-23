@@ -16,12 +16,13 @@ class Simulator(object):
         self.__SocialInfluence = None
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
-        self.alpha = self.environment.yield_alpha() # TODO alfredo
+        self.expected_alpha_r = self.environment.yield_expected_alpha(context_generation=False) # set to True in step 7
         self.prices = [
             [*price_and_margins.keys()]
             for price_and_margins in self.environment.prices_and_margins.values()
         ]
-        self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
+        # start with lowest prices
+        self.current_prices = [np.min(self.prices[idx]) for idx in range(self.environment.n_products)]
         # lambda to go to second secondary product
         self._lambda = 0.5
         self.learners: list[Learner] = [
@@ -30,7 +31,9 @@ class Simulator(object):
         ]
         self.social_influence = SocialInfluence()
         # estimate the matrix A (present in environment but not known)
-        self.estimated_edge_probas = list()
+        # TODO this should be updated, initialisation not required
+        self.estimated_edge_probas = [np.random.uniform(size=5) * [1 if j in self.secondaries[i] else 0 for j in range(5)]
+                                      for i in range(self.environment.n_products)]
 
     def sim_one_day(self) -> None:
         """
@@ -184,7 +187,7 @@ class Simulator(object):
     def c_rate(self, j):
         return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
 
-    def __influence_function(self, i, j):
+    def influence_function(self, i, j):
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
@@ -200,11 +203,12 @@ class Simulator(object):
 
         # all possible paths from index i to j (if j appears before other indices, we cut the path)
         paths = [path for path in itertools.permutations([k for k in range(5) if i != k])]
-
         influence = 0
         for path in paths:
+            print("Current path: ", path)
             path_proba = 1
             last_edge = i
+            history = [last_edge]
             for edge in path:
                 # if it is secondary
                 status = assign_sec(last_edge, edge)
@@ -212,16 +216,20 @@ class Simulator(object):
                     if edge == j:
                         path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
+                        print("History: ", history, "\nprobability: ", path_proba)
                         break   # finish the path
 
                     else:  # the edge is not a destination
                         path_proba *= self.c_rate(last_edge) * self.estimated_edge_probas[last_edge][j] *\
                                       (self._lambda if status == 2 else 1)
                         last_edge = edge  # update the last edge
+                        history.append(edge)
                 else:
                     path_proba *= 0  # infeasible: this product cannot be reached directly from last_edge
+                    print("History: ", history, "\nprobability: ", path_proba)
                     break  # go to next path
             influence += path_proba
+        return influence
 
     def greedy_algorithm(
         self, conversion_rates, margins, influence_probability
