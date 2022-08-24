@@ -1,7 +1,8 @@
-import random
-from typing import Any, Type
 import itertools
+import random
 from collections import deque, namedtuple
+from typing import Any, Type
+
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase
@@ -16,6 +17,7 @@ class Simulator(object):
         self.__SocialInfluence = None
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
+        self.hyperparameters: dict[str, Any]
         self.expected_alpha_r = self.environment.yield_expected_alpha(
             context_generation=False
         )  # set to True in step 7
@@ -69,10 +71,15 @@ class Simulator(object):
                 self.update_learners(buys=buys, prices=self.current_prices)
                 self.social_influence.add_episode(influenced_episodes)
 
-        # TODO: Add here Social Influence and Greedy Algorithm
+        # Regret calculator
+        # TODO(): Add here Social Influence and Greedy Algorithm
         self.estimated_edge_probas = [
-            self.social_influence.estimate_probabilities(i, n_products=5) for i in range(5)
+            self.social_influence.estimate_probabilities(i, n_products=5)
+            for i in range(self.environment.n_products)
         ]
+
+        # TODO(fil): Call greedy algorithm
+        # Setup next prices
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -129,10 +136,10 @@ class Simulator(object):
         while visiting_que:
             current_node = visiting_que.pop()
             product_id = current_node.product_id
-            visited[product_id] = 1
 
             # If the user clicks on it
             if random.random() <= current_node.probability and not visited[product_id]:
+                visited[product_id] = 1
                 # Simulate the buy of the product and update records
                 buys[product_id] = self.sim_buy(group, product_id, prices[product_id])
                 influence_episodes.append(

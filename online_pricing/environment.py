@@ -77,9 +77,6 @@ class EnvironmentBase:
         # initialise R session
         self.__init_R()
 
-        # have the number of users
-        self.__n_users = (10, 20, 5)
-
     def __init_R(self):
         """
         start R and download the roahd package, define the functions of the demand curves
@@ -99,13 +96,11 @@ class EnvironmentBase:
 
         :return: a list with the number of potential clients of each group
         """
-        self.__n_users = [
-            np.random.poisson(
-                self.distributions_parameters["n_people_params"]["group_" + str(i)], 1
-            )
-            for i in range(3)
-        ]
-        return self.__n_users
+        __n_users = (
+            np.random.poisson(self.distributions_parameters["n_people_params"][i], 1)
+            for i in range(self.n_groups)
+        )
+        return __n_users
 
     def sample_affinity(self, prod_id, group, first=True):
         return np.random.uniform(0, 1)
@@ -172,12 +167,16 @@ class EnvironmentBase:
         This function return a dictionary with an entry for each group. For each entry, a list of
         tuples that represent (client_id, primary_product_id).
 
+        TODO -> Return this { "group_id": [primary_product_id, ...],  }
+             -> primary_product_id in {-1, 0, .., n_products-1}
+
         :return: the direct clients with their primary product.
         """
+        n_user = self.sample_n_users()
         # TODO add
-        cumsum_clients = [0, *np.cumsum(self.__n_users)]
+        cumsum_clients = [0, *np.cumsum(n_user)]
         # TODO: not uniform
-        n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in self.__n_users]
+        n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in n_user]
 
         direct_clients = {
             f"group_{idx}": list(
@@ -187,11 +186,10 @@ class EnvironmentBase:
                         size=n_direct_clients[idx],
                         replace=False,
                     ),
-                    # note here -1 means the client goes to another website
-                    np.random.choice([-1] + list(range(self.n_products)), n_direct_clients[idx]),
+                    np.random.choice(list(range(self.n_products)), n_direct_clients[idx]),
                 )
             )
-            for idx, n_group in enumerate(self.__n_users)
+            for idx, n_group in enumerate(n_user)
         }
         return direct_clients
 
