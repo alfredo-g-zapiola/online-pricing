@@ -5,7 +5,7 @@ import numpy.typing as npt
 
 
 class SocialInfluence:
-    def __init__(self, n_products=5, n_episodes: int = 5, n_steps_max: int = 10):
+    def __init__(self, n_products, n_episodes: int = 5, n_steps_max: int = 10):
         self.n_episodes = n_episodes
         self.n_steps_max = n_steps_max  # da definire in base ai costumers
         self.dataset = list()
@@ -51,7 +51,7 @@ class SocialInfluence:
         :param node_index: il prodotto di partenza
         :return:
         """
-        # estimated_prob = np.ones(n_products) * 1.0 / (n_products - 1) <- NOT USED
+        # estimated_prob = np.ones(n_products) * 1.0 / (n_products - 1) non usato nel codice
         credit = np.zeros(n_products)
         occurr_v_active = np.zeros(n_products)
 
@@ -65,9 +65,7 @@ class SocialInfluence:
             for v in range(0, n_products):
                 if v != node_index:
                     idx_v_active = np.argwhere(episode[:, v] == 1).reshape(-1)
-                    if len(idx_v_active) > 0 and (
-                        idx_v_active < idx_w_active or len(idx_w_active) == 0
-                    ):
+                    if len(idx_v_active) > 0 and (idx_v_active < idx_w_active or len(idx_w_active) == 0):
                         occurr_v_active[v] += 1
 
         estimated_prob = credit / occurr_v_active
