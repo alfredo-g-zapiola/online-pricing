@@ -65,7 +65,9 @@ class SocialInfluence:
             for v in range(0, n_products):
                 if v != node_index:
                     idx_v_active = np.argwhere(episode[:, v] == 1).reshape(-1)
-                    if len(idx_v_active) > 0 and (idx_v_active < idx_w_active or len(idx_w_active) == 0):
+                    if len(idx_v_active) > 0 and (
+                        idx_v_active < idx_w_active or len(idx_w_active) == 0
+                    ):
                         occurr_v_active[v] += 1
 
         estimated_prob = credit / occurr_v_active
