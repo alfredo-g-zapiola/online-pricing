@@ -37,12 +37,19 @@ class EnvironmentBase:
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    [0.0] + np.random.uniform(0.8, 1, 4),
-                    np.random.uniform(0.8, 1, 1) + [0.0] + np.random.uniform(0.8, 1, 3),
-                    np.random.uniform(0.8, 1, 2) + [0.0] + np.random.uniform(0.8, 1, 2),
-                    np.random.uniform(0.8, 1, 3) + [0.0] + np.random.uniform(0.8, 1, 1),
-                    np.random.uniform(0.8, 1, 4) + [0.0],
+                    [0, 0.9, 0.9**2, 0.9**3, 0.9**4],
+                    [0.9**4, 0, 0.9, 0.9**2, 0.9**3],
+                    [0.9**3, 0.9**4, 0, 0.9, 0.9**2],
+                    [0.9**2, 0.9**3, 0.9**4, 0, 0.9],
+                    [0.9, 0.9**2, 0.9**3, 0.9**4, 0],
                 ]
+                # [
+                #     np.concatenate([np.array([0.0]), (np.random.uniform(0.8, 1, 4))]),
+                #     np.concatenate([np.random.uniform(0.8, 1, 2), np.array([0.0]), np.random.uniform(0.8, 1, 3)]),
+                #     np.concatenate([np.random.uniform(0.8, 1, 3), np.array([0.0]), np.random.uniform(0.8, 1, 2)]),
+                #     np.concatenate([np.random.uniform(0.8, 1, 4), np.array([0.0]), np.random.uniform(0.8, 1, 1)]),
+                #     np.concatenate([np.random.uniform(0.8, 1, 4), np.array([0.0])]),
+                # ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
             "product_graph_params": {
@@ -199,7 +206,7 @@ class EnvironmentBase:
         :param group:
         :return:
         """
-        m = self.distributions_parameters["quantity_demanded_params"]["group_" + str(group)]
+        m = self.distributions_parameters["quantity_demanded_params"][group]
         if uncertain:
             return np.random.poisson(m)
         else:
