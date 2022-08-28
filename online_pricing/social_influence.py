@@ -42,7 +42,7 @@ class SocialInfluence:
         Adds the episode of a user. Consumed at sim_one_user
         :param episode: a list of lists
         """
-        self.dataset.append(episode)
+        self.dataset.append(np.array(episode))
 
     def estimate_probabilities(self, node_index: int, n_products: int) -> npt.NDArray[int]:
         """
@@ -56,13 +56,10 @@ class SocialInfluence:
         occurr_v_active = np.zeros(n_products)
 
         for episode in self.dataset:
-            episode = np.array(episode)
             idx_w_active = np.argwhere(episode[:, node_index] == 1).reshape(-1)
-
             if len(idx_w_active) > 0 and idx_w_active > 0:
                 active_products_in_prev_step = episode[idx_w_active - 1, :].reshape(-1)
                 credit += active_products_in_prev_step / np.sum(active_products_in_prev_step)
-
 
             for v in range(0, n_products):
                 if v != node_index:
@@ -71,8 +68,6 @@ class SocialInfluence:
                         idx_v_active < idx_w_active or len(idx_w_active) == 0
                     ):
                         occurr_v_active[v] += 1
-        print("Credit: ", credit)
-        print("Occurr: ", occurr_v_active)
         estimated_prob = credit / occurr_v_active
         estimated_prob = np.nan_to_num(estimated_prob)
         return estimated_prob

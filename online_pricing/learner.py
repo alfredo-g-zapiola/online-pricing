@@ -27,33 +27,8 @@ class Learner:
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
 
-    def sample_arm(self, arm_id):
-        return np.random.uniform(0, 1)
-
-
-class GreedyLearner(Learner):
-    """Greedy learner.
-
-    Works by pulling the same arm every time.
-    This arm can be changed by the update method, which sets the next price in the list.
-    """
-
-    def __init__(self, n_arms: int, prices: list[int]):
-        super().__init__(n_arms, prices)
-        self.current_price = 0
-
-    def act(self) -> float:
-        return self.prices[self.current_price]
-
-    def greedy_act(self) -> int | None:
-        return (
-            self.prices[self.current_price + 1] if self.current_price < (self.n_arms - 1) else None
-        )
-
-    def update(self, arm_pulled: int, reward: int) -> None:  # i don't think this method is useful
-        super().update(arm_pulled, reward)
-        self.current_price += 1 if self.current_price < (self.n_arms - 1) else 0
-
+    def sample_arm(self, arm_id) -> float:
+        pass
 
 class Ucb(Learner):
     def __init__(self, n_arms: int, prices: list[int]):
@@ -75,6 +50,10 @@ class Ucb(Learner):
             else:
                 self.widths[idx] = np.inf
 
+    def sample_arm(self, arm_id):
+        value = self.means[arm_id] + self.widths[arm_id]
+        return value if value <= 1 else 1
+
 
 class TSLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):
@@ -92,3 +71,6 @@ class TSLearner(Learner):
         super().update(arm_pulled, reward)
         self.beta_parameters[arm_pulled, 0] = self.beta_parameters[arm_pulled, 0] + reward
         self.beta_parameters[arm_pulled, 1] = self.beta_parameters[arm_pulled, 1] + 1.0 - reward
+
+    def sample_arm(self, arm_id) -> float:
+        return np.random.beta(self.beta_parameters[arm_id, 0], self.beta_parameters[arm_id, 1])
