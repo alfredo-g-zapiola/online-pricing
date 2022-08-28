@@ -33,7 +33,7 @@ class Simulator(object):
             TSLearner(n_arms=self.environment.n_products, prices=self.prices[idx])
             for idx in range(self.environment.n_products)
         ]
-        self.social_influence = SocialInfluence()
+        self.social_influence = SocialInfluence(self.environment.n_products)
         # estimate the matrix A (present in environment but not known)
         # TODO this should be updated, initialisation not required
         self.estimated_edge_probas = [
@@ -134,11 +134,10 @@ class Simulator(object):
         # Initialize the queue with the landing product, it has a probability of 1 to be seen
         visiting_que = deque()
         visiting_que.append(VisitingNode(product_id=landing_product, probability=1))
-
         while visiting_que:
             current_node = visiting_que.pop()
             product_id = current_node.product_id
-
+            print(1)
             # If the user clicks on it
             if random.random() <= current_node.probability and not visited[product_id]:
                 visited[product_id] = 1
@@ -166,7 +165,7 @@ class Simulator(object):
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
         remove_landing = [
             sum_by_element(influence_episodes[idx], influence_episodes[0], difference=True)
-            for idx, _ in enumerate(visited)
+            for idx, _ in enumerate(influence_episodes)
         ]
 
         # Return history records
@@ -225,13 +224,11 @@ class Simulator(object):
         influence = 0
         histories = []
         for path in paths:
-            print("Current path: ", path)
             path_proba = 1
             last_edge = i
             history = [last_edge]
             for edge in path:
                 # if it is secondary
-                print("Path proba ", path_proba)
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
                     cur_jump_proba = (
@@ -245,9 +242,7 @@ class Simulator(object):
 
                         if history in histories:  # avoid repetitions
                             path_proba *= 0
-                            print("Already visited")
                         histories.append(history)
-                        print("History: ", history, "\nprobability: ", path_proba, "\n")
                         break  # finish the path
 
                     else:  # the edge is not a destination
@@ -258,7 +253,6 @@ class Simulator(object):
                     path_proba *= (
                         0  # infeasible: this product cannot be reached directly from last_edge
                     )
-                    print("Infeasible. History: ", history, "\nprobability: ", path_proba, "\n")
                     break  # go to next path
 
             influence += path_proba
@@ -320,7 +314,7 @@ class Simulator(object):
             margins[product_id][self.prices[product_id].index(idx)]
             for product_id, idx in enumerate(prices)
         ]
-        alpha_ratios = self.environment.yield_expected_alpha(context_generation=False)
+        alpha_ratios = self.expected_alpha_r
         conversion_rates = [
             self.learners[product_id].sample_arm(
                 self.learners[product_id].get_arm(prices[product_id])
@@ -329,11 +323,14 @@ class Simulator(object):
         ]
         return sum(
             [
-                alpha_ratios[product_id] * (
+                alpha_ratios[product_id]
+                * (
                     conversion_rates[product_id] * current_margins[product_id]
                     + sum(
                         [
                             self.influence_function(product_id, secondary_product_id)
+                            * conversion_rates[product_id]
+                            * current_margins[product_id]
                             for secondary_product_id in range(self.environment.n_products)
                             if secondary_product_id != product_id
                         ]

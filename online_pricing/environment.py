@@ -1,8 +1,12 @@
+import sys
+from contextlib import contextmanager
+
 import numpy as np
 
 # from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
+import rpy2
 
 
 class EnvironmentBase:
@@ -83,20 +87,21 @@ class EnvironmentBase:
         :return: void
         """
         # Install the roahd package
-        utils = importr("utils")
-        utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
-        utils.install_packages("roahd")
+        with suppress_stdout():
+            utils = importr("utils")
+            utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
+            utils.install_packages("roahd")
         with open("online_pricing/initialise_R.R", "r") as file:
             code = file.read().rstrip()
             robjects.r(code)
 
-    def sample_n_users(self):
+    def sample_n_users(self) -> tuple:
         """
         Samples from the poisson distribution how many new potential clients of each group arrive on the current day
 
         :return: a list with the number of potential clients of each group
         """
-        __n_users = (
+        __n_users = tuple(
             np.random.poisson(self.distributions_parameters["n_people_params"][i], 1)
             for i in range(self.n_groups)
         )
@@ -146,7 +151,6 @@ class EnvironmentBase:
             return fname
 
         fname = get_fname(prod_id, group)
-        print(fname)
         if uncertain:
             d = robjects.r(
                 """
@@ -266,3 +270,17 @@ class EnvironmentStep4(EnvironmentBase):
         :return: realisations of the
         """
         # todo implement
+
+
+@contextmanager
+def suppress_stdout():
+    save_stdout = sys.stdout
+    sys.stdout = None
+
+    back_up_interface = rpy2.rinterface_lib.callbacks.consolewrite_print
+    rpy2.rinterface_lib.callbacks.consolewrite_print = lambda x: None
+
+    yield
+
+    sys.stdout = save_stdout
+    rpy2.rinterface_lib.callbacks.consolewrite_print = back_up_interface
