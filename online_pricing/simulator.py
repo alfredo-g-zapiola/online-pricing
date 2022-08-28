@@ -310,6 +310,39 @@ class Simulator(object):
 
         return best_configuration
 
+    # TODO(film): add group support and check this (coded too fast)
+    def objective_function(self, prices: list[float]) -> float:
+        margins = [
+            [*price_and_margins.values()]
+            for price_and_margins in self.environment.prices_and_margins.values()
+        ]
+        current_margins = [
+            margins[product_id][self.prices[product_id].index(idx)]
+            for product_id, idx in enumerate(prices)
+        ]
+        alpha_ratios = self.environment.yield_expected_alpha(context_generation=False)
+        conversion_rates = [
+            self.learners[product_id].sample_arm(
+                self.learners[product_id].get_arm(prices[product_id])
+            )
+            for product_id in range(self.environment.n_products)
+        ]
+        return sum(
+            [
+                alpha_ratios[product_id] * (
+                    conversion_rates[product_id] * current_margins[product_id]
+                    + sum(
+                        [
+                            self.influence_function(product_id, secondary_product_id)
+                            for secondary_product_id in range(self.environment.n_products)
+                            if secondary_product_id != product_id
+                        ]
+                    )
+                )
+                for product_id in range(self.environment.n_products)
+            ]
+        )
+
     # def greedy_algorithm_v0(
     #     self, conversion_rates, margins, influence_probability
     # ):  # greedy alg without considering groups. Alpha is a list of 5 elements,
