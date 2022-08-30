@@ -3,12 +3,17 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
+from learner import TSLearner
+
 
 class SocialInfluence:
     def __init__(self, n_products, n_episodes: int = 5, n_steps_max: int = 10):
         self.n_episodes = n_episodes
+        self.n_products = n_products
         self.n_steps_max = n_steps_max  # da definire in base ai costumers
         self.dataset = list()
+        # number of edges ( we have one learner for each ones
+        self.learners = [(TSLearner(1,[0]),TSLearner(1,[0]) ) for i in range(n_products)]
 
     def simulate_episode(self, init_prob_matrix: list[list[int]], n_step_max: int):
         init_prob_matrix = cast(npt.NDArray[int, int], np.array(init_prob_matrix))
@@ -44,7 +49,8 @@ class SocialInfluence:
         """
         self.dataset.append(np.array(episode))
 
-    def estimate_probabilities(self, node_index: int, n_products: int) -> npt.NDArray[int]:
+    def estimate_probabilities(self, node_index: int, ):
+    def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
         """
         Stima la probabilità di influence dal prodotto node_index a tutti gli altri.
 
