@@ -25,7 +25,7 @@ class Simulator(object):
             [*price_and_margins.keys()]
             for price_and_margins in self.environment.prices_and_margins.values()
         ]
-        # start with lowest prices
+        # start with the lowest prices
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
         # lambda to go to second secondary product
         self._lambda = 0.5
@@ -35,9 +35,9 @@ class Simulator(object):
         ]
         self.social_influence = SocialInfluence(self.environment.n_products, secondaries=self.secondaries)
         # estimate the matrix A (present in environment but not known)
-        # TODO this should be updated, initialisation not required
+        # this is later updated, initialisation not required
         self.estimated_edge_probas = [
-            np.random.uniform(size=5) * [1 if j in self.secondaries[i] else 0 for j in range(5)]
+            [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
             for i in range(self.environment.n_products)
         ]
 
@@ -72,10 +72,7 @@ class Simulator(object):
                 self.social_influence.add_episode(influenced_episodes)
 
         # Regret calculator
-        self.estimated_edge_probas = [
-            self.social_influence.estimate_probabilities(i, n_products=5)
-            for i in range(self.environment.n_products)
-        ]
+        self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx] for idx in next_day_configuration]

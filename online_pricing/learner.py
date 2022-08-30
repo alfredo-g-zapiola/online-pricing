@@ -74,3 +74,11 @@ class TSLearner(Learner):
 
     def sample_arm(self, arm_id) -> float:
         return np.random.beta(self.beta_parameters[arm_id, 0], self.beta_parameters[arm_id, 1])
+
+    def mean_arm(self, arm_id) -> float:
+        """
+        Returns the mean of the beta distribution for such arm id.
+        :param arm_id:
+        :return:
+        """
+        return self.beta_parameters[arm_id, 0] / (self.beta_parameters[arm_id, 0] + self.beta_parameters[arm_id, 1] )
