@@ -41,11 +41,11 @@ class EnvironmentBase:
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    np.asarray([0.0] + list(np.random.uniform(0.8, 1, 4))),
-                    np.asarray(list(np.random.uniform(0.8, 1, size=1)) + [0.0] + list(np.random.uniform(0.8, 1, size=3))),
-                    np.asarray(list(np.random.uniform(0.8, 1, size=2)) + [0.0] + list(np.random.uniform(0.8, 1, size=2))),
-                    np.asarray(list(np.random.uniform(0.8, 1, size=3)) + [0.0] + list(np.random.uniform(0.8, 1, size=1))),
-                    np.asarray(list(np.random.uniform(0.8, 1, size=4)) + [0.0]),
+                    np.asarray([0.0] + list(np.random.uniform(0.9, 1, 4))),
+                    np.asarray(list(np.random.uniform(0.9, 1, size=1)) + [0.0] + list(np.random.uniform(0.9, 1, size=3))),
+                    np.asarray(list(np.random.uniform(0.9, 1, size=2)) + [0.0] + list(np.random.uniform(0.9, 1, size=2))),
+                    np.asarray(list(np.random.uniform(0.9, 1, size=3)) + [0.0] + list(np.random.uniform(0.9, 1, size=1))),
+                    np.asarray(list(np.random.uniform(0.9, 1, size=4)) + [0.0]),
                 ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
