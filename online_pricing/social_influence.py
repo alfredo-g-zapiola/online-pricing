@@ -13,7 +13,7 @@ class SocialInfluence:
         self.dataset = list()
         self.secondaries = secondaries
         # number of edges (we have one learner for each one)
-        self.learners = [(TSLearner(1,[0]),TSLearner(1,[0]) ) for i in range(n_products)]
+        self.learners = [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
 
     def simulate_episode(self, init_prob_matrix: list[list[int]], n_step_max: int):
         init_prob_matrix = cast(npt.NDArray[int, int], np.array(init_prob_matrix))
@@ -75,7 +75,12 @@ class SocialInfluence:
 
         # estimated edge probabilities. The edge proba is 0 if it is not in the secondary products
         estimated_edge_probas = [
-            [self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) if j in self.secondaries[i] else 0 for j in range(5)]
+            [
+                self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0)
+                if j in self.secondaries[i]
+                else 0
+                for j in range(5)
+            ]
             for i in range(self.n_products)
         ]
         return estimated_edge_probas

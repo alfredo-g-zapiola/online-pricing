@@ -1,12 +1,8 @@
-import sys
-from contextlib import contextmanager
-
 import numpy as np
 
-##  from scipy.stats import wishart # for step 5: uncertain graph weights
+# from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
-import rpy2
 
 
 class EnvironmentBase:
@@ -42,9 +38,21 @@ class EnvironmentBase:
             "product_graph": np.array(
                 [
                     np.asarray([0.0] + list(np.random.uniform(0.9, 1, 4))),
-                    np.asarray(list(np.random.uniform(0.9, 1, size=1)) + [0.0] + list(np.random.uniform(0.9, 1, size=3))),
-                    np.asarray(list(np.random.uniform(0.9, 1, size=2)) + [0.0] + list(np.random.uniform(0.9, 1, size=2))),
-                    np.asarray(list(np.random.uniform(0.9, 1, size=3)) + [0.0] + list(np.random.uniform(0.9, 1, size=1))),
+                    np.asarray(
+                        list(np.random.uniform(0.9, 1, size=1))
+                        + [0.0]
+                        + list(np.random.uniform(0.9, 1, size=3))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.9, 1, size=2))
+                        + [0.0]
+                        + list(np.random.uniform(0.9, 1, size=2))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.9, 1, size=3))
+                        + [0.0]
+                        + list(np.random.uniform(0.9, 1, size=1))
+                    ),
                     np.asarray(list(np.random.uniform(0.9, 1, size=4)) + [0.0]),
                 ]
             ),
@@ -87,10 +95,9 @@ class EnvironmentBase:
         :return: void
         """
         # Install the roahd package
-        with suppress_stdout():
-            utils = importr("utils")
-            utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
-            utils.install_packages("roahd")
+        utils = importr("utils")
+        utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
+        utils.install_packages("roahd")
         with open("online_pricing/initialise_R.R", "r") as file:
             code = file.read().rstrip()
             robjects.r(code)
@@ -270,17 +277,3 @@ class EnvironmentStep4(EnvironmentBase):
         :return: realisations of the
         """
         # todo implement
-
-
-@contextmanager
-def suppress_stdout():
-    save_stdout = sys.stdout
-    sys.stdout = None
-
-    back_up_interface = rpy2.rinterface_lib.callbacks.consolewrite_print
-    rpy2.rinterface_lib.callbacks.consolewrite_print = lambda x: None
-
-    yield
-
-    sys.stdout = save_stdout
-    rpy2.rinterface_lib.callbacks.consolewrite_print = back_up_interface

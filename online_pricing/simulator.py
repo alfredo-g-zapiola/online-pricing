@@ -11,7 +11,7 @@ from online_pricing.social_influence import SocialInfluence
 
 
 class Simulator(object):
-    def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 41703192):
+    def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 0):
         self.seed = seed
         self.groups = range(3)
         self.__SocialInfluence = None
@@ -33,7 +33,9 @@ class Simulator(object):
             TSLearner(n_arms=self.environment.n_products, prices=self.prices[idx])
             for idx in range(self.environment.n_products)
         ]
-        self.social_influence = SocialInfluence(self.environment.n_products, secondaries=self.secondaries)
+        self.social_influence = SocialInfluence(
+            self.environment.n_products, secondaries=self.secondaries
+        )
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required
         self.estimated_edge_probas = [
@@ -75,7 +77,19 @@ class Simulator(object):
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         next_day_configuration = self.greedy_algorithm()
-        self.current_prices = [self.prices[idx] for idx in next_day_configuration]
+        self.current_prices = [
+            self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)
+        ]
+
+        print("\n =========== DAY OVER ===========")
+        print("Products sold:", products_sold)
+        print("Current prices:", self.current_prices)
+        print("Next configuration:", next_day_configuration)
+        print("Estimated edge probabilities:")
+        print_matrix(self.estimated_edge_probas)
+        print("Product Graph:")
+        print_matrix(self.environment.distributions_parameters["product_graph"])
+        print("\n")
 
         return products_sold
         # Setup next prices
@@ -93,11 +107,11 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
-        willing_price = self.environment.sample_demand_curve(
+        buy_probability = self.environment.sample_demand_curve(
             group=group, prod_id=product_id, price=price, uncertain=False
         )  # TODO filippo we could make one simulator per step
         n_units = 0
-        if price < willing_price:
+        if random.random() <= buy_probability:
             n_units = self.environment.sample_quantity_bought(group)
 
         return n_units
@@ -134,7 +148,6 @@ class Simulator(object):
         while visiting_que:
             current_node = visiting_que.pop()
             product_id = current_node.product_id
-            print(1)
             # If the user clicks on it
             if random.random() <= current_node.probability and not visited[product_id]:
                 visited[product_id] = 1
@@ -144,15 +157,16 @@ class Simulator(object):
 
                 # If the user bought something, we unlock the secondary products
                 if buys[product_id]:
+
                     # Add the first advised to the queue
-                    first_advised = (self.secondaries[product_id].primary,)
+                    first_advised = self.secondaries[product_id][0]
                     first_probability = product_graph[product_id][first_advised]
                     visiting_que.append(
                         VisitingNode(product_id=first_advised, probability=first_probability)
                     )
 
                     # Add the second advised to the queue
-                    second_advised = self.secondaries[product_id].secondary
+                    second_advised = self.secondaries[product_id][1]
                     second_probability = product_graph[product_id][second_advised] * self._lambda
                     visiting_que.append(
                         VisitingNode(product_id=second_advised, probability=second_probability)
@@ -160,13 +174,19 @@ class Simulator(object):
 
         # We need to return the history of jumpes between pages, but just the information about
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
-        remove_landing = [
-            sum_by_element(influence_episodes[idx], influence_episodes[0], difference=True)
-            for idx, _ in enumerate(influence_episodes)
-        ]
+        history = influence_episodes[:3]
+        prepare_episode = list()
+        prepare_episode.append(
+            history[0] if buys[landing_product] else [0] * self.environment.n_products
+        )
+        prepare_episode.append(
+            sum_by_element(history[-1], history[0], difference=True)
+            if buys[landing_product]
+            else None
+        )
 
         # Return history records
-        return buys, remove_landing[:3]
+        return buys, [episode for episode in prepare_episode if episode is not None]
 
     def update_learners(self, buys: list[int], prices: list[float]) -> None:
         """
@@ -184,20 +204,6 @@ class Simulator(object):
 
         for idx, bought in enumerate(did_buy):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
-
-    def formula(self, alpha, conversion_rates, margins, influence_probability):
-        s1 = 0
-        s2 = 0
-        sum = 0
-        for i in range(0, 5):
-            s1 += conversion_rates[i] * margins[i]
-            for j in range(0, 5):
-                if i != j:
-                    s2 += influence_probability[i][j] * conversion_rates[j] * margins[j]
-            sum = sum + alpha[i] * (s1 + s2)
-            s2 = 0
-            s1 = 0
-        return sum
 
     def c_rate(self, j):
         return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
@@ -273,11 +279,9 @@ class Simulator(object):
         current_target = self.objective_function(
             [self.prices[product_id][0] for product_id in products]
         )
-
         has_changed = True
         while has_changed:
             has_changed = False
-
             for price_to_increase in products:
 
                 new_configuration = best_configuration.copy()
@@ -318,6 +322,7 @@ class Simulator(object):
             )
             for product_id in range(self.environment.n_products)
         ]
+
         return sum(
             [
                 alpha_ratios[product_id]
@@ -326,8 +331,8 @@ class Simulator(object):
                     + sum(
                         [
                             self.influence_function(product_id, secondary_product_id)
-                            * conversion_rates[product_id]
-                            * current_margins[product_id]
+                            * conversion_rates[secondary_product_id]
+                            * current_margins[secondary_product_id]
                             for secondary_product_id in range(self.environment.n_products)
                             if secondary_product_id != product_id
                         ]
@@ -450,6 +455,17 @@ def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = Fa
     :param difference: if True, return the difference between the two arrays.
     :return: list or matrix with the sum of the two arrays.
     """
+
+
+def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = False) -> list[Any]:
+    """
+    Sum lists - or matrices - by element.
+
+    :param array_1: list or matrix to sum.
+    :param array_2: list or matrix to sum.
+    :param difference: if True, return the difference between the two arrays.
+    :return: list or matrix with the sum of the two arrays.
+    """
     if type(array_1) is not type(array_2):
         raise TypeError(f"Arrays must be of the same type, got {type(array_1)} and {type(array_2)}")
 
@@ -460,3 +476,7 @@ def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = Fa
         return [a1 - a2 for a1, a2 in zip(array_1, array_2)]
 
     return [sum(items) for items in zip(array_1, array_2)]
+
+
+def print_matrix(matrix: list[list[Any]]) -> None:
+    print("\n".join(["".join(["{:.2f} ".format(item) for item in row]) for row in matrix]))

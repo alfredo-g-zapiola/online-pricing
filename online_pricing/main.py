@@ -8,6 +8,5 @@ def main():
         simulator.sim_one_day()
 
 
-
 if __name__ == "__main__":
     main()
