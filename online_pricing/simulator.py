@@ -206,7 +206,7 @@ class Simulator(object):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
     def c_rate(self, j):
-        return self.learners[j].sample_arm(np.argwhere(self.prices[j] == self.current_prices[j]))
+        return self.learners[j].sample_arm(self.learners[j].get_arm(self.current_prices[j]))
 
     def influence_function(self, i, j):
         """
