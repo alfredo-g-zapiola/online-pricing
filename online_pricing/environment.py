@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 import numpy as np
 
-# from scipy.stats import wishart # for step 5: uncertain graph weights
+##  from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 import rpy2
