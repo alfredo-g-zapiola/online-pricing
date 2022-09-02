@@ -14,7 +14,6 @@ class Simulator(object):
     def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 0):
         self.seed = seed
         self.groups = range(3)
-        self.__SocialInfluence = None
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
         self.hyperparameters: dict[str, Any]
@@ -34,7 +33,7 @@ class Simulator(object):
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence(
-            self.environment.n_products, secondaries=self.secondaries
+            self.environment.n_products, secondaries=self.secondaries, lambda_param=self._lambda
         )
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required

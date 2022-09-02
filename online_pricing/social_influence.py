@@ -7,13 +7,14 @@ from online_pricing.learner import TSLearner
 
 
 class SocialInfluence:
-    def __init__(self, n_products, secondaries, n_episodes: int = 5):
+    def __init__(self, n_products, secondaries, lambda_param, n_episodes: int = 5):
+        self.lambda_param = lambda_param
         self.n_episodes = n_episodes
         self.n_products = n_products
         self.dataset = list()
         self.secondaries = secondaries
         # number of edges (we have one learner for each one)
-        self.learners = [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
+        self.learners = np.array([(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)])
 
     def simulate_episode(self, init_prob_matrix: list[list[int]], n_step_max: int):
         init_prob_matrix = cast(npt.NDArray[int, int], np.array(init_prob_matrix))
@@ -54,6 +55,7 @@ class SocialInfluence:
         Look into all episodes of the day, and updates the beta distribution of each learner
         :return: the estimated probabilities of the edges
         """
+        # print("Estimating today's probabilities")
         for episode in self.dataset:
             # print(episode)
             # print(episode)
@@ -61,6 +63,7 @@ class SocialInfluence:
             prod = np.argwhere(episode[0] != 0)  # starting node
             if not len(prod) > 0:
                 # we did not even buy the landing product
+                # print("Did not buy the landing product")
                 continue
             else:
                 prod = prod[0][0]
@@ -68,21 +71,26 @@ class SocialInfluence:
             # print(episode[1][self.secondaries[prod][0]])
             reward_first_sec = episode[1][self.secondaries[prod][0]]
             reward_sec_sec = episode[1][self.secondaries[prod][1]]
-            # update learner
-            self.learners[0][0].update(0, reward_first_sec)
-            self.learners[0][1].update(0, reward_sec_sec)
+            # print("Bought product: ", prod, "\nThe rewards were: ", reward_first_sec, reward_first_sec)
+            # update plearner
+            self.learners[prod][0].update(0, reward_first_sec)
+            self.learners[prod][1].update(0, reward_sec_sec)
         self.dataset = list()  # we do not need today's data anymore
 
         # estimated edge probabilities. The edge proba is 0 if it is not in the secondary products
         estimated_edge_probas = [
             [
-                self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0)
+                self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) /
+                (1 if j == self.secondaries[i][0] else self.lambda_param)
                 if j in self.secondaries[i]
                 else 0
                 for j in range(5)
             ]
             for i in range(self.n_products)
         ]
+        for l1, l2 in self.learners:
+            print(l1.beta_parameters)
+            print(l2.beta_parameters)
         return estimated_edge_probas
 
     def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
