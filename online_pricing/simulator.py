@@ -8,6 +8,7 @@ import numpy as np
 from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
+from online_pricing.tracer import Tracer
 
 
 class Simulator(object):
@@ -21,7 +22,11 @@ class Simulator(object):
             context_generation=False
         )  # set to True in step 7
         self.prices = [
-            [*price_and_margins.keys()]
+            [price_and_margin[0] for price_and_margin in price_and_margins]
+            for price_and_margins in self.environment.prices_and_margins.values()
+        ]
+        self.margins = [
+            [price_and_margin[1] for price_and_margin in price_and_margins]
             for price_and_margins in self.environment.prices_and_margins.values()
         ]
         # start with the lowest prices
@@ -41,6 +46,7 @@ class Simulator(object):
             [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
             for i in range(self.environment.n_products)
         ]
+        self.tracer = Tracer()
 
     def sim_one_day(self) -> None:
         """
@@ -55,12 +61,14 @@ class Simulator(object):
         """
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int, int] = [0] * self.environment.n_products
+        n_users = 0
 
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
                 if primary_product == -1:
                     continue  # Client didn't visit the website
 
+                n_users += 1
                 buys, influenced_episodes = self.sim_one_user(
                     group=group,
                     landing_product=primary_product,
@@ -75,6 +83,15 @@ class Simulator(object):
         # Regret calculator
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
+        current_margins = [
+            self.margins[product_id][self.prices[product_id].index(idx)]
+            for product_id, idx in enumerate(self.current_prices)
+        ]
+        mean_reward_per_client = self.get_reward(
+            n_user=n_users, products_sold=products_sold, margins=current_margins
+        )
+        self.tracer.add_measurement(mean_reward_per_client)
+
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
             self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)
@@ -83,6 +100,8 @@ class Simulator(object):
         print("\n =========== DAY OVER ===========")
         print("Products sold:", products_sold)
         print("Current prices:", self.current_prices)
+        print("Current margins:", current_margins)
+        print("Mean reward per client:", mean_reward_per_client)
         print("Next configuration:", next_day_configuration)
         print("Estimated edge probabilities:")
         print_matrix(self.estimated_edge_probas)
@@ -306,12 +325,9 @@ class Simulator(object):
 
     # TODO(film): add group support and check this (coded too fast)
     def objective_function(self, prices: list[float]) -> float:
-        margins = [
-            [*price_and_margins.values()]
-            for price_and_margins in self.environment.prices_and_margins.values()
-        ]
+
         current_margins = [
-            margins[product_id][self.prices[product_id].index(idx)]
+            self.margins[product_id][self.prices[product_id].index(idx)]
             for product_id, idx in enumerate(prices)
         ]
         alpha_ratios = self.expected_alpha_r
@@ -341,108 +357,19 @@ class Simulator(object):
             ]
         )
 
-    # def greedy_algorithm_v0(
-    #     self, conversion_rates, margins, influence_probability
-    # ):  # greedy alg without considering groups. Alpha is a list of 5 elements,
-    #     prices = [0, 0, 0, 0, 0]  # conversion_rates and margins are matrix 5x4 (products x prices)
-    #     max = self.formula(
-    #         self.alpha, conversion_rates[:, 0], margins[:, 0], influence_probability
-    #     )  # influence_probability is a matrix 5x5 (products x products) where cell ij is the
-    #     while True:  # probability to go from i to j
-    #         changed = False
-    #         best = prices  # best configuration
-    #         for i in range(0, 5):
-    #             temp = prices  # new configuration where it is incremented the price of a product
-    #             cr = []  # list of 5 conversion rates, one for each product, to pass to the formula
-    #             mr = []  # list of 5 margins, one for each product, to pass to the formula
-    #             temp[i] += 1  # one price is incremented
-    #             if temp[i] > 3:
-    #                 temp[i] = 3  # there are max 4 prices
-    #             for j in range(0, 5):
-    #                 cr.append(
-    #                     conversion_rates[j, temp[j]]
-    #                 )  # for each product j, I obtain its conversion rate knowing its price in temp[j]
-    #                 mr.append(
-    #                     margins[j, temp[j]]
-    #                 )  # for each product j, I obtain its margin knowing its price in temp[j]
-    #             n = self.formula(self.alpha, cr, mr, influence_probability)
-    #             if n > max:
-    #                 max = n
-    #                 best = temp  # save the best configuration
-    #                 changed = True
-    #         if not changed:
-    #             return best
-    #         if changed:
-    #             prices = best
-    #
-    # def formula_with_groups(self, list_alpha, conversion_rates, margins, influence_probability):
-    #     s1 = 0
-    #     s2 = 0
-    #     sum = 0
-    #     for g in range(0, 3):
-    #         for i in range(0, 5):
-    #             s1 += conversion_rates[g][i] * margins[i]
-    #             for j in range(0, 5):
-    #                 if i != j:
-    #                     s2 += influence_probability[i][j] * conversion_rates[g][j] * margins[j]
-    #             sum = sum + list_alpha[g][i] * (s1 + s2)
-    #             s2 = 0
-    #             s1 = 0
-    #     return sum
-    #
-    # def greedy_algorithm_with_groups(
-    #     self, list_alpha, list_conversion_rates, margins, influence_probability
-    # ):  # greedy algorithm considering groups. Same as before except for:
-    #     prices = [
-    #         0,
-    #         0,
-    #         0,
-    #         0,
-    #         0,
-    #     ]  # list_alpha is a list of 3 lists where each list contains 5 elements
-    #     conversion_rates = (
-    #         []
-    #     )  # list_conversion_rates is a list of 3 matrices where each matrix is 5x4 (products x prices)
-    #     for g in range(0, 3):
-    #         conversion_rates.append(list_conversion_rates[g][:, 0])
-    #     max = self.formula_with_groups(
-    #         list_alpha,
-    #         conversion_rates,
-    #         margins[:, 0],
-    #         influence_probability,  # compute the value for the configuration 0,0,0,0,0
-    #     )
-    #     while True:
-    #         changed = False
-    #         best = prices  # best configuration
-    #         for i in range(0, 5):
-    #             temp = prices  # new configuration where it is incremented the price of a product
-    #             cr = [
-    #                 [0 for v in range(5)] for w in range(3)
-    #             ]  # 3 lists containining 5 conversion rates, one for each product in each group, to pass to the formula
-    #             mr = (
-    #                 []
-    #             )  # 3 lists containining 5 margins, one for each product in each group, to pass to the formula
-    #             temp[i] += 1  # one price is incremented
-    #             if temp[i] > 3:
-    #                 temp[i] = 3  # there are max 4 prices
-    #             for g in range(0, 3):
-    #                 for j in range(0, 5):
-    #                     cr[g][j] = list_conversion_rates[g][
-    #                         j, temp[j]
-    #                     ]  # for each product j in group g, I obtain its conversion rate knowing its price in temp[j]
-    #             for k in range(0, 5):
-    #                 mr.append(
-    #                     margins[k, temp[k]]
-    #                 )  # for each product j in group g, I obtain its margin knowing its price in temp[j]
-    #             n = self.formula_with_groups(list_alpha, cr, mr, influence_probability)
-    #             if n > max:
-    #                 max = n
-    #                 best = temp  # save the best configuration
-    #                 changed = True
-    #         if not changed:
-    #             return best
-    #         if changed:
-    #             prices = best
+    def get_reward(self, n_user, products_sold, margins):
+        """
+        Get the reward for a given user, given the products sold and the margins.
+
+        :param n_user: number of the user.
+        :param products_sold: list of products sold.
+        :param margins: list of margins.
+        :return: reward for the user.
+        """
+        return (
+            sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)])
+            / n_user
+        )
 
 
 def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = False) -> list[Any]:

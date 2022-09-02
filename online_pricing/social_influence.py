@@ -65,9 +65,6 @@ class SocialInfluence:
             for i in range(self.n_products)
         ]
 
-        for l1, l2 in self.learners:
-            print(l1.parameters, l2.parameters)
-
         return estimated_edge_probas
 
     def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
