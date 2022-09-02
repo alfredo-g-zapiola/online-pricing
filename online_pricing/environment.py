@@ -37,23 +37,23 @@ class EnvironmentBase:
             # product graph probabilities
             "product_graph": np.array(
                 [
-                    np.asarray([0.0] + list(np.random.uniform(0.9, 1, 4))),
+                    np.asarray([0.0] + list(np.random.uniform(0.5, 1, 4))),
                     np.asarray(
-                        list(np.random.uniform(0.9, 1, size=1))
+                        list(np.random.uniform(0.5, 1, size=1))
                         + [0.0]
-                        + list(np.random.uniform(0.9, 1, size=3))
+                        + list(np.random.uniform(0.5, 1, size=3))
                     ),
                     np.asarray(
-                        list(np.random.uniform(0.9, 1, size=2))
+                        list(np.random.uniform(0.5, 1, size=2))
                         + [0.0]
-                        + list(np.random.uniform(0.9, 1, size=2))
+                        + list(np.random.uniform(0.5, 1, size=2))
                     ),
                     np.asarray(
-                        list(np.random.uniform(0.9, 1, size=3))
+                        list(np.random.uniform(0.5, 1, size=3))
                         + [0.0]
-                        + list(np.random.uniform(0.9, 1, size=1))
+                        + list(np.random.uniform(0.5, 1, size=1))
                     ),
-                    np.asarray(list(np.random.uniform(0.9, 1, size=4)) + [0.0]),
+                    np.asarray(list(np.random.uniform(0.5, 1, size=4)) + [0.0]),
                 ]
             ),
             # A Wishart distribution is assumed for the product graph probabilities
@@ -88,6 +88,7 @@ class EnvironmentBase:
 
         # initialise R session
         self.__init_R()
+
     def __init_R(self):
         """
         start R and download the roahd package, define the functions of the demand curves

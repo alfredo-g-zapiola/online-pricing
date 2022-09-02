@@ -12,6 +12,10 @@ class Learner:
         self.rewards_per_arm: list[list[int]] = [[] for _ in range(n_arms)]
         self.pulled_arms: list[int] = []
 
+    @property
+    def parameters(self) -> list[tuple[float, float]]:
+        return [(0, 0)]
+
     def reset(self) -> None:
         pass
 
@@ -60,6 +64,10 @@ class TSLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):
         super().__init__(n_arms, prices)
         self.beta_parameters = np.ones((n_arms, 2))
+
+    @property
+    def parameters(self) -> list[tuple[float, float]]:
+        return [tuple(self.beta_parameters[i]) for i in range(self.n_arms)]
 
     def pull_arm(self) -> int:
         idx = np.argmax(

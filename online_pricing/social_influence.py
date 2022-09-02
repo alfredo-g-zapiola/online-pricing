@@ -14,34 +14,9 @@ class SocialInfluence:
         self.dataset = list()
         self.secondaries = secondaries
         # number of edges (we have one learner for each one)
-        self.learners = np.array([(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)])
-
-    def simulate_episode(self, init_prob_matrix: list[list[int]], n_step_max: int):
-        init_prob_matrix = cast(npt.NDArray[int, int], np.array(init_prob_matrix))
-
-        prob_matrix = init_prob_matrix.copy()
-        n_products = prob_matrix.shape[0]
-
-        initial_active_products = np.random.binomial(1, 0.1, size=n_products)
-        history = np.array([initial_active_products])
-
-        newly_active_products = active_products = initial_active_products
-
-        for iteration in range(n_step_max):
-            if np.sum(newly_active_products) > 0:
-                break
-
-            p = (prob_matrix.T * active_products).T
-
-            active_edges = p > np.random.rand(p.shape[0], p.shape[1])
-            prob_matrix = prob_matrix * ((p != 0) == active_edges)  # aggiornamento prob matrix
-
-            newly_active_products = (np.sum(active_edges, axis=0) > 0) * (1 - active_products)
-            active_products = np.array(active_products + newly_active_products)
-
-            history = np.concatenate((history, [newly_active_products]), axis=0)
-
-        return history  # storico nodi (prodotti) attivati
+        self.learners = np.array(
+            [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
+        )
 
     def add_episode(self, episode: list[list[int]]) -> None:
         """
@@ -71,7 +46,7 @@ class SocialInfluence:
             # print(episode[1][self.secondaries[prod][0]])
             reward_first_sec = episode[1][self.secondaries[prod][0]]
             reward_sec_sec = episode[1][self.secondaries[prod][1]]
-            # print("Bought product: ", prod, "\nThe rewards were: ", reward_first_sec, reward_first_sec)
+            # print("Bought product: ", prod, "\nThe rewards were: ", reward_first_sec, reward_sec_sec)
             # update plearner
             self.learners[prod][0].update(0, reward_first_sec)
             self.learners[prod][1].update(0, reward_sec_sec)
@@ -80,14 +55,19 @@ class SocialInfluence:
         # estimated edge probabilities. The edge proba is 0 if it is not in the secondary products
         estimated_edge_probas = [
             [
-                max([1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) /
-                (1 if j == self.secondaries[i][0] else self.lambda_param)])
-                if j in self.secondaries[i]
-                else 0
+                min(
+                    [1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) / 1]
+                )
+                # (1 if j == self.secondaries[i][0] else self.lambda_param)])
+                if j in self.secondaries[i] else 0
                 for j in range(5)
             ]
             for i in range(self.n_products)
         ]
+
+        for l1, l2 in self.learners:
+            print(l1.parameters, l2.parameters)
+
         return estimated_edge_probas
 
     def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
