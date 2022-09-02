@@ -80,17 +80,14 @@ class SocialInfluence:
         # estimated edge probabilities. The edge proba is 0 if it is not in the secondary products
         estimated_edge_probas = [
             [
-                self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) /
-                (1 if j == self.secondaries[i][0] else self.lambda_param)
+                max([1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) /
+                (1 if j == self.secondaries[i][0] else self.lambda_param)])
                 if j in self.secondaries[i]
                 else 0
                 for j in range(5)
             ]
             for i in range(self.n_products)
         ]
-        for l1, l2 in self.learners:
-            print(l1.beta_parameters)
-            print(l2.beta_parameters)
         return estimated_edge_probas
 
     def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
