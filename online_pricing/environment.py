@@ -45,27 +45,68 @@ class EnvironmentBase:
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 2, 3],
             # product graph probabilities
-            "product_graph": np.array(
+            "product_graph": [np.array(
                 [
                     np.asarray([0.0] + list(np.random.uniform(0.5, 1, 4))),
                     np.asarray(
-                        list(np.random.uniform(0.5, 1, size=1))
+                        list(np.random.uniform(0.2, .8, size=1))
                         + [0.0]
-                        + list(np.random.uniform(0.5, 1, size=3))
+                        + list(np.random.uniform(0.2, .8, size=3))
                     ),
                     np.asarray(
-                        list(np.random.uniform(0.5, 1, size=2))
+                        list(np.random.uniform(0.2, .8, size=2))
                         + [0.0]
-                        + list(np.random.uniform(0.5, 1, size=2))
+                        + list(np.random.uniform(0.2, .8, size=2))
                     ),
                     np.asarray(
-                        list(np.random.uniform(0.5, 1, size=3))
+                        list(np.random.uniform(0.2, .8, size=3))
                         + [0.0]
-                        + list(np.random.uniform(0.5, 1, size=1))
+                        + list(np.random.uniform(0.2, .8, size=1))
                     ),
-                    np.asarray(list(np.random.uniform(0.5, 1, size=4)) + [0.0]),
+                    np.asarray(list(np.random.uniform(0.2, .8, size=4)) + [0.0]),
                 ]
-            ),
+            ), np.array(
+                [
+                    np.asarray([0.0] + list(np.random.uniform(0.3, .9, 4))),
+                    np.asarray(
+                        list(np.random.uniform(0.3, .9, size=1))
+                        + [0.0]
+                        + list(np.random.uniform(0.3, .9, size=3))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.3, .9, size=2))
+                        + [0.0]
+                        + list(np.random.uniform(0.3, .9, size=2))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.3, .9, size=3))
+                        + [0.0]
+                        + list(np.random.uniform(0.3, .9, size=1))
+                    ),
+                    np.asarray(list(np.random.uniform(0.3, .9, size=4)) + [0.0]),
+                ]
+            ), np.array(
+                [
+                    np.asarray([0.0] + list(np.random.uniform(0.4, .1, 4))),
+                    np.asarray(
+                        list(np.random.uniform(0.4, .1, size=1))
+                        + [0.0]
+                        + list(np.random.uniform(0.4, .1, size=3))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.4, .1, size=2))
+                        + [0.0]
+                        + list(np.random.uniform(0.4, .1, size=2))
+                    ),
+                    np.asarray(
+                        list(np.random.uniform(0.4, .1, size=3))
+                        + [0.0]
+                        + list(np.random.uniform(0.4, .1, size=1))
+                    ),
+                    np.asarray(list(np.random.uniform(0.4, .1, size=4)) + [0.0]),
+                ]
+            )
+            ], # end of product_graph matrices list
             # A Wishart distribution is assumed for the product graph probabilities
             "product_graph_params": {
                 "group 0": {
