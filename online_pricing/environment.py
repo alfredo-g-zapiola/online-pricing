@@ -24,13 +24,13 @@ class EnvironmentBase:
             "echo_show": {96: 96 - 38.4, 91.2: 91.2 - 38.4, 76.8: 76.8 - 38.4, 38.4: 0},
         }
 
-        # function parameters (can also be opened with a json)
+        # function parameters (can also be  opened with a json)
         self.distributions_parameters = {
             "n_people_params": [70, 50, 20],  # we have more poor people than rich people
-            "dirichlet_params": [  # TODO dobbiamo giustificare le scelte qui
-                np.asarray([7.65579946, 10.28353546, 5.16981654, 9.36425095, 9.26960117]),
-                np.asarray([14.54449788, 6.60476974, 11.29606424, 6.1703656, 8.9336728]),
-                np.asarray([12.89094056, 11.09866667, 9.96773461, 9.15999453, 7.7894984]),
+            "dirichlet_params": [
+                np.asarray([15, 10, 6, 5, 4, 6]),
+                np.asarray([12, 9, 6, 4, 3, 4]),
+                np.asarray([5, 5, 9, 7, 7, 8]),
             ],
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 2, 3],
@@ -88,7 +88,6 @@ class EnvironmentBase:
 
         # initialise R session
         self.__init_R()
-
     def __init_R(self):
         """
         start R and download the roahd package, define the functions of the demand curves
@@ -171,23 +170,32 @@ class EnvironmentBase:
             curve_f = robjects.r["{}".format(fname)]
             return curve_f(price)[0]
 
-    def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
+    def get_direct_clients(self, uncertain_alpha=False) -> dict[str, list[tuple[int, int]]]:
         """
         Get all direct clients, for each group, with their respective primary product.
 
         This function return a dictionary with an entry for each group. For each entry, a list of
         tuples that represent (client_id, primary_product_id).
 
-        TODO -> Return this { "group_id": [primary_product_id, ...],  }
-             -> primary_product_id in {-1, 0, .., n_products-1}
+        :param: uncertain_alpha. False if we take the expected value of the alpha_ratios (mean of
+        dirichlet distribution),
+        True to sample from the dirichlet distribution
 
-        :return: the direct clients with their primary product.
+        :return: -> Return this { "group_id": [primary_product_id, ...],  }
+             -> primary_product_id in {-1, 0, .., n_products-1}
         """
         n_user = self.sample_n_users()
-        # TODO add
         cumsum_clients = [0, *np.cumsum(n_user)]
-        # TODO: not uniform
-        n_direct_clients = [int(np.random.uniform(0, n_group)) for n_group in n_user]
+        if uncertain_alpha:
+            dirichlet_sample = [np.random.dirichlet(self.distributions_parameters["dirichlet_params"][g])
+                            for g in range(self.n_groups)]
+        else:
+            # we just take each element of the vector and divide it by the sum to get the expected value
+            dirichlet_sample = [self.distributions_parameters["dirichlet_params"][g] / self.distributions_parameters["dirichlet_params"][g].sum()
+                            for g in range(self.n_groups)]
+
+        # take out clients going away (i.e. alpha_0)
+        n_direct_clients = [int(n_user[g][0] * (1- dirichlet_sample[g][0]))  for g in range(self.n_groups)]
 
         direct_clients = {
             f"group_{idx}": list(
@@ -197,7 +205,10 @@ class EnvironmentBase:
                         size=n_direct_clients[idx],
                         replace=False,
                     ),
-                    np.random.choice(list(range(self.n_products)), n_direct_clients[idx]),
+                    np.random.choice(list(range(self.n_products)),
+                                     n_direct_clients[idx],
+                                     # take out element 0, re-normalise
+                                     p=dirichlet_sample[idx][1:] / dirichlet_sample[idx][1:].sum()),
                 )
             )
             for idx, n_group in enumerate(n_user)

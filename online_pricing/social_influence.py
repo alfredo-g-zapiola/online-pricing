@@ -57,7 +57,7 @@ class SocialInfluence:
         """
         # print("Estimating today's probabilities")
         for episode in self.dataset:
-            # print(episode)
+            # print("Current episode ", episode)
             # print(episode)
             # print(np.argwhere(episode[0] != 0))
             prod = np.argwhere(episode[0] != 0)  # starting node
