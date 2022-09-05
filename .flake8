@@ -1,6 +1,6 @@
 [flake8]
 exclude = .venv,node_modules
-max-line-length = 100
+max-line-length = 125
 
 # see https://flake8.pycqa.org/en/latest/user/error-codes.html
 ignore =
