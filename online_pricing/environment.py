@@ -312,7 +312,7 @@ class EnvironmentBase:
                 np.asarray(
                     [
                         self.distributions_parameters["n_people_params"][i]
-                        * self.distributions_parameters["dirichlet_params"][i]
+                        * self.distributions_parameters["dirichlet_params"][i] / self.distributions_parameters["dirichlet_params"][i].sum()
                         for i in range(self.n_groups)
                     ]
                 )
@@ -320,7 +320,7 @@ class EnvironmentBase:
                 [self.distributions_parameters["n_people_params"][i] for i in range(self.n_groups)]
             )
         else:
-            return self.distributions_parameters["dirichlet_params"]
+            return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
 
 class EnvironmentStep4(EnvironmentBase):
