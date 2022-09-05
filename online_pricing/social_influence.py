@@ -3,20 +3,18 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
-from online_pricing.learner import TSLearner
+from online_pricing.learner import Learner, TSLearner
 
 
 class SocialInfluence:
-    def __init__(self, n_products, secondaries, lambda_param, n_episodes: int = 5):
+    def __init__(self, n_products: int, secondaries: list[list[int]], lambda_param: float, n_episodes: int = 5) -> None:
         self.lambda_param = lambda_param
         self.n_episodes = n_episodes
         self.n_products = n_products
-        self.dataset = list()
+        self.dataset: list[npt.NDArray[int]] = list()
         self.secondaries = secondaries
         # number of edges (we have one learner for each one)
-        self.learners = np.array(
-            [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
-        )
+        self.learners: list[tuple[Learner, Learner]] = [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
 
     def add_episode(self, episode: list[list[int]]) -> None:
         """
@@ -25,7 +23,7 @@ class SocialInfluence:
         """
         self.dataset.append(np.array(episode))
 
-    def estimate_probabilities(self):
+    def estimate_probabilities(self) -> list[list[int | float]]:
         """
         Look into all episodes of the day, and updates the beta distribution of each learner
         :return: the estimated probabilities of the edges
@@ -55,9 +53,7 @@ class SocialInfluence:
         # estimated edge probabilities. The edge proba is 0 if it is not in the secondary products
         estimated_edge_probas = [
             [
-                min(
-                    [1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) / 1]
-                )
+                min([1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) / 1])
                 # (1 if j == self.secondaries[i][0] else self.lambda_param)])
                 if j in self.secondaries[i] else 0
                 for j in range(5)
@@ -67,14 +63,15 @@ class SocialInfluence:
 
         return estimated_edge_probas
 
-    def estimate_probabilities_old(self, node_index: int, n_products: int) -> npt.NDArray[int]:
+    def estimate_probabilities_old(self, node_index: int, n_products: int) -> list[float]:
         """
-        Stima la probabilità di influence dal prodotto node_index a tutti gli altri.
+        Estimates the probabilities of the edges of the graph from node_index to the other nodes
 
-        :param node_index: il prodotto di partenza
-        :return:
+        :param node_index: the primary product
+        :param n_products: the number of products
+        :return: a list of probabilities
         """
-        # estimated_prob = np.ones(n_products) * 1.0 / (n_products - 1) non usato nel codice
+        # estimated_prob = np.ones(n_products) * 1.0 / (n_products - 1)
         credit = np.zeros(n_products)
         occurr_v_active = np.zeros(n_products)
 
@@ -87,13 +84,11 @@ class SocialInfluence:
             for v in range(0, n_products):
                 if v != node_index:
                     idx_v_active = np.argwhere(episode[:, v] == 1).reshape(-1)
-                    if len(idx_v_active) > 0 and (
-                        idx_v_active < idx_w_active or len(idx_w_active) == 0
-                    ):
+                    if len(idx_v_active) > 0 and (idx_v_active < idx_w_active or len(idx_w_active) == 0):
                         occurr_v_active[v] += 1
         estimated_prob = credit / occurr_v_active
         estimated_prob = np.nan_to_num(estimated_prob)
-        return estimated_prob
+        return cast(list[float], estimated_prob.tolist())
 
     #
     # def __test(self):

@@ -1,33 +1,31 @@
 import itertools
 import random
 from collections import deque, namedtuple
-from typing import Any, Type
+from typing import Any, Deque, Type, TypeVar, cast
 
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase
+from online_pricing.influence_function import InfluenceFunctor
 from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
-from online_pricing.InfluenceFunction import InfluenceFunctor
+
 
 class Simulator(object):
     def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 0):
-        self.seed = seed
+        self.seed = seed  # TODO: use this
         self.groups = range(3)
         self.environment = environment()
         self.secondaries = self.environment.yield_first_secondaries()
-        self.hyperparameters: dict[str, Any]
-        self.expected_alpha_r = self.environment.yield_expected_alpha(
-            context_generation=False
-        )  # set to True in step 7
+        self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
         self.prices = [
-            [price_and_margin[0] for price_and_margin in price_and_margins]
-            for price_and_margins in self.environment.prices_and_margins.values()
+            [price_and_margin[0] for price_and_margin in prices_and_margins]
+            for prices_and_margins in self.environment.prices_and_margins.values()
         ]
         self.margins = [
-            [price_and_margin[1] for price_and_margin in price_and_margins]
-            for price_and_margins in self.environment.prices_and_margins.values()
+            [price_and_margin[1] for price_and_margin in prices_and_margins]
+            for prices_and_margins in self.environment.prices_and_margins.values()
         ]
         # start with the lowest prices
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
@@ -46,7 +44,7 @@ class Simulator(object):
             [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
             for i in range(self.environment.n_products)
         ]
-        self._influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
+        self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
         self.tracer = Tracer()
 
     def sim_one_day(self) -> None:
@@ -61,7 +59,7 @@ class Simulator(object):
         along with the empirical influence matrix that records the jumps to secondary products.
         """
         direct_clients = self.environment.get_direct_clients()
-        products_sold: list[int, int] = [0] * self.environment.n_products
+        products_sold: list[int] = [0] * self.environment.n_products
         n_users = 0
 
         for group in self.groups:
@@ -73,7 +71,7 @@ class Simulator(object):
                 buys, influenced_episodes = self.sim_one_user(
                     group=group,
                     landing_product=primary_product,
-                    product_graph=self.environment.distributions_parameters["product_graph"].copy(),
+                    product_graph=self.environment.distributions_parameters["product_graph"][group].copy(),
                     prices=self.current_prices,
                 )
                 products_sold = sum_by_element(products_sold, buys)
@@ -88,15 +86,11 @@ class Simulator(object):
             self.margins[product_id][self.prices[product_id].index(idx)]
             for product_id, idx in enumerate(self.current_prices)
         ]
-        mean_reward_per_client = self.get_reward(
-            n_user=n_users, products_sold=products_sold, margins=current_margins
-        )
+        mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         self.tracer.add_measurement(mean_reward_per_client)
 
         next_day_configuration = self.greedy_algorithm()
-        self.current_prices = [
-            self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)
-        ]
+        self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
         print("\n =========== DAY OVER ===========")
         print("Products sold:", products_sold)
@@ -107,11 +101,8 @@ class Simulator(object):
         print("Estimated edge probabilities:")
         print_matrix(self.estimated_edge_probas)
         print("Product Graph:")
-        print_matrix(self.environment.distributions_parameters["product_graph"])
+        print_matrix(self.environment.distributions_parameters["product_graph"][0])
         print("\n")
-
-        return products_sold
-        # Setup next prices
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -162,7 +153,7 @@ class Simulator(object):
         VisitingNode = namedtuple("VisitingNode", ["product_id", "probability"])
 
         # Initialize the queue with the landing product, it has a probability of 1 to be seen
-        visiting_que = deque()
+        visiting_que: Deque[VisitingNode] = deque()
         visiting_que.append(VisitingNode(product_id=landing_product, probability=1))
         while visiting_que:
             current_node = visiting_que.pop()
@@ -180,29 +171,18 @@ class Simulator(object):
                     # Add the first advised to the queue
                     first_advised = self.secondaries[product_id][0]
                     first_probability = product_graph[product_id][first_advised]
-                    visiting_que.append(
-                        VisitingNode(product_id=first_advised, probability=first_probability)
-                    )
+                    visiting_que.append(VisitingNode(product_id=first_advised, probability=first_probability))
 
                     # Add the second advised to the queue
                     second_advised = self.secondaries[product_id][1]
                     second_probability = product_graph[product_id][second_advised] * self._lambda
-                    visiting_que.append(
-                        VisitingNode(product_id=second_advised, probability=second_probability)
-                    )
+                    visiting_que.append(VisitingNode(product_id=second_advised, probability=second_probability))
 
         # We need to return the history of jumpes between pages, but just the information about
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
         history = influence_episodes[:3]
-        prepare_episode = list()
-        prepare_episode.append(
-            history[0] if buys[landing_product] else [0] * self.environment.n_products
-        )
-        prepare_episode.append(
-            sum_by_element(history[-1], history[0], difference=True)
-            if buys[landing_product]
-            else None
-        )
+        prepare_episode = [history[0] if buys[landing_product] else [0] * self.environment.n_products]
+        prepare_episode.append(sum_by_element(history[-1], history[0], difference=True) if buys[landing_product] else None)
 
         # Return history records
         return buys, [episode for episode in prepare_episode if episode is not None]
@@ -216,23 +196,22 @@ class Simulator(object):
         :param buys: list of number of units bought per product
         :param prices: prices of the products
         """
-        arms_pulled = [
-            self.learners[idx].get_arm(prices[idx]) for idx in range(self.environment.n_products)
-        ]
+        arms_pulled = [self.learners[idx].get_arm(prices[idx]) for idx in range(self.environment.n_products)]
         did_buy = [int(buy > 0) for buy in buys]
 
         for idx, bought in enumerate(did_buy):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
-    def c_rate(self, j):
-        return self.learners[j].sample_arm(self.learners[j].get_arm(self.current_prices[j]))
+    def conversion_rate(self, product_id: int) -> float:
+        return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(self.current_prices[product_id]))
 
-    def influence_function(self, i, j):
+    def influence_function(self, i: int, j: int) -> float:
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
-        return self._influence_functor(i,j, self.c_rate, self.estimated_edge_probas)
+
+        return self.influence_functor(i, j, self.conversion_rate, self.estimated_edge_probas)
 
     def greedy_algorithm(self) -> list[int]:
         """
@@ -240,8 +219,8 @@ class Simulator(object):
 
         It works as follows:
         Starting from the lowest configuration, which is the cheapest configuration with price indexes equal to 0,
-        it iteratively increases one of the prices, checks if the new configuration has a better objective function value, and
-        if so, it sets this new configuration. It does this until no better configurations exists.
+        it iteratively increases one of the prices, checks if the new configuration has a better objective
+        function value, and if so, it sets this new configuration. It does this until no better configurations exists.
 
         :return: the best configuration of prices for the next day
         """
@@ -249,9 +228,7 @@ class Simulator(object):
         n_prices = len(self.prices[0])
 
         best_configuration = [0] * self.environment.n_products
-        current_target = self.objective_function(
-            [self.prices[product_id][0] for product_id in products]
-        )
+        current_target = self.objective_function([self.prices[product_id][0] for product_id in products])
         has_changed = True
         while has_changed:
             has_changed = False
@@ -265,10 +242,7 @@ class Simulator(object):
                 new_configuration[price_to_increase] += 1
 
                 new_target = self.objective_function(
-                    [
-                        self.prices[product_id][new_configuration[product_id]]
-                        for product_id in products
-                    ]
+                    [self.prices[product_id][new_configuration[product_id]] for product_id in products]
                 )
                 # If objective value is higher, update the configuration
                 if new_target > current_target:
@@ -282,14 +256,11 @@ class Simulator(object):
     def objective_function(self, prices: list[float]) -> float:
 
         current_margins = [
-            self.margins[product_id][self.prices[product_id].index(idx)]
-            for product_id, idx in enumerate(prices)
+            self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)
         ]
         alpha_ratios = self.expected_alpha_r
         conversion_rates = [
-            self.learners[product_id].sample_arm(
-                self.learners[product_id].get_arm(prices[product_id])
-            )
+            self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
             for product_id in range(self.environment.n_products)
         ]
 
@@ -312,7 +283,7 @@ class Simulator(object):
             ]
         )
 
-    def get_reward(self, n_user, products_sold, margins):
+    def get_reward(self, n_user: int, products_sold: list[int], margins: list[float]) -> float:
         """
         Get the reward for a given user, given the products sold and the margins.
 
@@ -321,24 +292,13 @@ class Simulator(object):
         :param margins: list of margins.
         :return: reward for the user.
         """
-        return (
-            sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)])
-            / n_user
-        )
+        return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user
 
 
-def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = False) -> list[Any]:
-    """
-    Sum lists - or matrices - by element.
-
-    :param array_1: list or matrix to sum.
-    :param array_2: list or matrix to sum.
-    :param difference: if True, return the difference between the two arrays.
-    :return: list or matrix with the sum of the two arrays.
-    """
+MATRIX = TypeVar("MATRIX", bound=list[int])
 
 
-def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = False) -> list[Any]:
+def sum_by_element(array_1: MATRIX, array_2: MATRIX, difference: bool = False) -> MATRIX:
     """
     Sum lists - or matrices - by element.
 
@@ -359,5 +319,5 @@ def sum_by_element(array_1: list[Any], array_2: list[Any], difference: bool = Fa
     return [sum(items) for items in zip(array_1, array_2)]
 
 
-def print_matrix(matrix: list[list[Any]]) -> None:
-    print("\n".join(["".join(["{:.2f} ".format(item) for item in row]) for row in matrix]))
+def print_matrix(matrix: list[list[float]]) -> None:
+    print("\n".join(["".join([f"{item:.2f} " for item in row]) for row in matrix]))

@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Regret:
@@ -35,8 +35,8 @@ class Regret:
         plt.show()
 
     plt.figure(1)
-    plt.plot(np.cumsum(ts_istantaneous_regret), "r")
-    plt.plot(np.cumsum(swts_istantaneous_regret), "b")
+    # plt.plot(np.cumsum(ts_istantaneous_regret), "r")
+    # plt.plot(np.cumsum(swts_istantaneous_regret), "b")
     plt.legend(["TS", "SWTS"])
     plt.ylabel("Regret")
     plt.xlabel("t")
