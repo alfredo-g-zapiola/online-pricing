@@ -4,6 +4,8 @@ import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
+from online_pricing.InfluenceFunction import InfluenceFunctor
+
 
 class EnvironmentBase:
     def __init__(self) -> None:
@@ -33,7 +35,7 @@ class EnvironmentBase:
                 (96, 57.6),
             ],
         }
-
+        self._lambda = .5
         # function parameters (can also be  opened with a json)
         self.distributions_parameters = {
             "n_people_params": [70, 50, 20],  # we have more poor people than rich people
@@ -137,6 +139,8 @@ class EnvironmentBase:
         # higher beta, higher ...
         self.__beta_demand = 0
 
+        self._influence_functor = InfluenceFunctor(self.yield_first_secondaries(),
+                                                   self._lambda)
         # initialise R session
         self.__init_R()
 

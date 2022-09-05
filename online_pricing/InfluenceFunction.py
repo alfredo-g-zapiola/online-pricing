@@ -1,15 +1,17 @@
 import itertools
 
 class InfluenceFunctor:
-    def __init__(self, secondaries, c_rate, edge_probas):
+    def __init__(self, secondaries, _lambda):
         self.secondaries = secondaries
-        self.c_rate = c_rate
-        self.edge_probas = edge_probas
+        self._lambda = _lambda
 
-    def __call__(self, i, j):
+    def __call__(self, i, j, c_rate, edge_probas):
         """
-        Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
-        :return:
+        :param i: starting product
+        :param j: other product
+        :param c_rate: function that yields the conversion rate of product of p \in P
+        :param edge_probas: the edge probabilities (estimated in the case they are unknown)
+        :return: sum of probabilities of different paths to click j given that i was bought
         """
 
         def assign_sec(k, l):
@@ -33,8 +35,8 @@ class InfluenceFunctor:
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
                     cur_jump_proba = (
-                        self.c_rate(last_edge)
-                        * self.estimated_edge_probas[last_edge][edge]
+                        c_rate(last_edge)
+                        * edge_probas[last_edge][edge]
                         * (self._lambda if status == 2 else 1)
                     )
                     if edge == j:

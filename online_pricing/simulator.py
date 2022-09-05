@@ -9,7 +9,7 @@ from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
-
+from online_pricing.InfluenceFunction import InfluenceFunctor
 
 class Simulator(object):
     def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 0):
@@ -32,7 +32,7 @@ class Simulator(object):
         # start with the lowest prices
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
         # lambda to go to second secondary product
-        self._lambda = 0.5
+        self._lambda = self.environment._lambda
         self.learners: list[Learner] = [
             TSLearner(n_arms=self.environment.n_products, prices=self.prices[idx])
             for idx in range(self.environment.n_products)
@@ -46,6 +46,7 @@ class Simulator(object):
             [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
             for i in range(self.environment.n_products)
         ]
+        self._influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
         self.tracer = Tracer()
 
     def sim_one_day(self) -> None:
@@ -231,53 +232,7 @@ class Simulator(object):
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
-
-        def assign_sec(k, l):
-            if self.secondaries[k][0] == l:
-                return 1
-            elif self.secondaries[k][1] == l:
-                return 2
-            else:
-                return 0
-
-        # all possible paths from index i to j (if j appears before other indices, we cut the path)
-        paths = [path for path in itertools.permutations([k for k in range(5) if i != k])]
-        influence = 0
-        histories = []
-        for path in paths:
-            path_proba = 1
-            last_edge = i
-            history = [last_edge]
-            for edge in path:
-                # if it is secondary
-                status = assign_sec(last_edge, edge)
-                if status > 0:  # if it appears as a secondary
-                    cur_jump_proba = (
-                        self.c_rate(last_edge)
-                        * self.estimated_edge_probas[last_edge][edge]
-                        * (self._lambda if status == 2 else 1)
-                    )
-                    if edge == j:
-
-                        path_proba *= cur_jump_proba
-
-                        if history in histories:  # avoid repetitions
-                            path_proba *= 0
-                        histories.append(history)
-                        break  # finish the path
-
-                    else:  # the edge is not a destination
-                        path_proba *= cur_jump_proba
-                        last_edge = edge  # update the last edge
-                        history.append(edge)
-                else:
-                    path_proba *= (
-                        0  # infeasible: this product cannot be reached directly from last_edge
-                    )
-                    break  # go to next path
-
-            influence += path_proba
-        return influence
+        return self._influence_functor(i,j, self.c_rate, self.estimated_edge_probas)
 
     def greedy_algorithm(self) -> list[int]:
         """
