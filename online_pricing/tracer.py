@@ -31,7 +31,7 @@ class Tracer:
         plt.show()
 
     def moving_average(self) -> list[float]:
-        window = 5
+        window = 7
         average = []
         for idx in range(len(self.measurements) - window + 1):
             average.append(np.mean(self.measurements[idx : idx + window]))

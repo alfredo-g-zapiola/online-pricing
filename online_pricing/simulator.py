@@ -265,7 +265,7 @@ class Simulator(object):
 
         return sum(
             [
-                alpha_ratios[product_id]
+                alpha_ratios[product_id + 1]
                 * (
                     conversion_rates[product_id] * current_margins[product_id]
                     + sum(
@@ -291,7 +291,7 @@ class Simulator(object):
         :param margins: list of margins.
         :return: reward for the user.
         """
-        return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user
+        return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user if n_user > 0 else 0
 
     def plot(self) -> None:
         """Plot the evolution of the objective function."""

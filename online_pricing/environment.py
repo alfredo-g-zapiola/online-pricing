@@ -1,3 +1,4 @@
+import itertools
 from typing import Any, cast
 
 import numpy as np
@@ -8,7 +9,7 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 from online_pricing.influence_function import InfluenceFunctor
-import itertools
+
 
 class EnvironmentBase:
     def __init__(self, n_products: int = 5, n_groups: int = 3, hyperparameters: dict[str, Any] | None = None) -> None:
@@ -53,12 +54,7 @@ class EnvironmentBase:
             ],
         }
         self.n_prices = len(self.prices_and_margins[list(self.prices_and_margins.keys())[0]])
-        self.product_id_map = {0: "echo_dot",
-                               1: "ring_chime",
-                               2: "ring_f",
-                               3: "ring_v",
-                               4: "echo_show"
-        }
+        self.product_id_map = {0: "echo_dot", 1: "ring_chime", 2: "ring_f", 3: "ring_v", 4: "echo_show"}
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
@@ -326,36 +322,43 @@ class EnvironmentBase:
         expected_alpha_r = self.yield_expected_alpha()
 
         rewards = {}
-        maximum = 0.
+        maximum = 0.0
         max_arm = ""
 
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
             print("Current price config: ", str(price_config))
-            cur_reward = 0.
+            cur_reward = 0.0
             price_and_margin = lambda p: self.prices_and_margins[self.product_id_map[p]][price_config[p]]
+
             def c_rate(p):
-                """ Compute the conversion rate fixed with fixed group and prices.
+                """Compute the conversion rate fixed with fixed group and prices.
                 This is why the function is redefined daily"""
-                return self.sample_demand_curve(group=g, prod_id=p,
-                                                 price=price_and_margin(p)[0])
+                return self.sample_demand_curve(group=g, prod_id=p, price=price_and_margin(p)[0])
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
-                g_reward = 0.
+                g_reward = 0.0
                 for p in range(self.n_products):  # for each starting product
-                    g_reward += expected_alpha_r[g][p+1] * (  # plus one since 0 corresponds to leaving the website
-
-                        c_rate(p) *
-                        price_and_margin(p)[1] * quantity +
-                        sum([self._influence_functor(p, p2, c_rate,
-                                                     self.distributions_parameters["product_graph"][g]) *
-                             c_rate(p2) * price_and_margin(p2)[1] * quantity
-                             for p2 in range(self.n_products) if p2 != p])
+                    g_reward += expected_alpha_r[g][p + 1] * (  # plus one since 0 corresponds to leaving the website
+                        c_rate(p) * price_and_margin(p)[1] * quantity
+                        + sum(
+                            [
+                                self._influence_functor(p, p2, c_rate, self.distributions_parameters["product_graph"][g])
+                                * c_rate(p2)
+                                * price_and_margin(p2)[1]
+                                * quantity
+                                for p2 in range(self.n_products)
+                                if p2 != p
+                            ]
+                        )
                     )
-                cur_reward += g_reward * self.distributions_parameters["n_people_params"][g]  # weight it according to number of people
-            cur_reward /= sum([self.distributions_parameters["n_people_params"][g]
-                               for g in range(self.n_groups)])  # normalise
+                cur_reward += (
+                    g_reward * self.distributions_parameters["n_people_params"][g]
+                )  # weight it according to number of people
+            cur_reward /= sum(
+                [self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)]
+            )  # normalise
 
             rewards[str(price_config)] = cur_reward
             if cur_reward > maximum:
