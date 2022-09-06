@@ -34,7 +34,7 @@ class Learner(ABC):
         pass
 
 
-class UCB(Learner):
+class UCBLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):
         super().__init__(n_arms, prices)
         self.means = [0.0] * n_arms

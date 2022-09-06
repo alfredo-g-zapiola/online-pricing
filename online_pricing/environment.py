@@ -23,8 +23,11 @@ class EnvironmentBase:
         self.fully_connected = hyperparameters.get("fully_connected", True)
         self.context_generation = hyperparameters.get("context_generation", False)
         self.uncertain_alpha = hyperparameters.get("uncertain_alpha", False)
-        self.group_unknown = hyperparameters.get("group_unknown", False)
+        self.group_unknown = hyperparameters.get("group_unknown", True)
         self._lambda = hyperparameters.get("lambda", 0.5)
+        self.uncertain_demand_curve = hyperparameters.get("uncertain_demand_curve", False)
+        self.uncertain_quantity_bought = hyperparameters.get("uncertain_quantity_bought", False)
+        self.uncertain_graph_weights = hyperparameters.get("uncertain_graph_weights", False)
 
         """
         Prices and margins: taken from the demand_curves.R we have the prices.
@@ -52,7 +55,7 @@ class EnvironmentBase:
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
+            "n_people_params": [700, 0, 0],  # we have more poor people than rich people
             "dirichlet_params": [
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
@@ -61,7 +64,7 @@ class EnvironmentBase:
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 2, 3],
             # product graph probabilities
-            "product_graph": [random_product_matrix(size=(n_products, n_products), fully_connected=self.fully_connected)]
+            "product_graph": [self.product_matrix(size=(n_products, n_products), fully_connected=self.fully_connected)]
             * n_groups,  # end of product_graph matrices list
             # A Wishart distribution is assumed for the product graph probabilities
             "product_graph_params": {
@@ -121,14 +124,12 @@ class EnvironmentBase:
     # def sample_affinity(self, prod_id, group, first=True):
     #     return np.random.uniform(0, 1)
 
-    @staticmethod
-    def sample_demand_curve(group: int, prod_id: int, price: float, uncertain: bool = False) -> float:
+    def sample_demand_curve(self, group: int, prod_id: int, price: float) -> float:
         """
 
         :param group: the id of the group
         :param prod_id: the id of the product
         :param price: the price at which we want to sample
-        :param uncertain: whether we want to sample from an uncertain demand curve
         :return: a price the client is willing to pay
         """
 
@@ -157,7 +158,7 @@ class EnvironmentBase:
             case _:
                 raise ValueError("Invalid group id")
 
-        if uncertain:
+        if self.uncertain_demand_curve:
             robjects.r(
                 """
                 d <- sample.demand({}, {}, 0, 200 )
@@ -221,16 +222,15 @@ class EnvironmentBase:
         }
         return direct_clients
 
-    def sample_quantity_bought(self, group: int, uncertain: bool = False) -> int:
+    def sample_quantity_bought(self, group: int) -> int:
         """
         Sample the quantity of products bought by a client of a given group
 
         :param group: the id of the group
-        :param uncertain: whether we want to sample from an uncertain demand curve
         :return: the quantity of products bought by a client of a given group
         """
         m: int = self.distributions_parameters["quantity_demanded_params"][group]
-        if uncertain:
+        if self.uncertain_quantity_bought:
             return int(np.random.poisson(m))
 
         return m
@@ -251,18 +251,11 @@ class EnvironmentBase:
 
         :return: A list of n_products where for each product we have the two secondaries
         """
-        if self.group_unknown:
-            return [
-                np.flip(np.argsort(self.distributions_parameters["product_graph"][0][i]))[:2] for i in range(self.n_products)
-            ]
-
         return [
-            np.flip(np.argsort(self.distributions_parameters["product_graph"][i][j]))[:2]
-            for j in range(self.n_products)
-            for i in range(self.n_groups)
+            np.flip(np.argsort(self.distributions_parameters["product_graph"][0][i]))[:2].astype(int, copy=False)
+            for i in range(self.n_products)
         ]
 
-    # TODO: fix this for context generation
     def yield_expected_alpha(self) -> list[float]:
         """
         It is assumed the simulator knows the expected values of the alpha ratios.
@@ -289,43 +282,27 @@ class EnvironmentBase:
 
         return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
-
-class EnvironmentStep4(EnvironmentBase):
-    def sample_alpha_ratios(self) -> None:
+    def product_matrix(self, size: tuple[int, int], fully_connected: bool = True) -> npt.NDArray[np.float64]:
         """
-        Override this method since alpha ratios become uncertain: we thus instead of just dint hte expected value to the
-        simulator we sample from the dirichlet the distribution.
+        Generate random product matrix.
 
-        :return: the realisations of the alpha ratios (dirichlet distribution9
+        :param size: size of the matrix, i.e. (n_products, n_products)
+        :param fully_connected: if True, the matrix is fully connected, i.e. all products are connected to all other products
+        :return: a random product matrix
         """
-        # todo implement
+        if self.uncertain_graph_weights:
+            # TODO(flavio) qua fai uncertain
+            pass
+        else:
+            random_matrix = np.random.uniform(0.5, 0.51, size=size)
+        np.fill_diagonal(random_matrix, val=0.0)
 
-    def sample_items_sold(self) -> None:
-        """
-        The quantity of items sold becomes uncertain so now we sample instead of just returning the
-        expected value.
-        :return: realisations of the
-        """
-        # todo implement
+        if not fully_connected:
+            flatten_matrix = random_matrix.flatten()
+            indices_size = int(np.floor(len(flatten_matrix) * 0.60))  # 60% of the matrix is zeroed
+            indices = np.random.choice(range(len(flatten_matrix)), size=indices_size, replace=False)
 
+            flatten_matrix[indices] = 0.0
+            random_matrix = flatten_matrix.reshape(size)
 
-def random_product_matrix(size: tuple[int, int], fully_connected: bool = True) -> npt.NDArray[np.float64]:
-    """
-    Generate random product matrix.
-
-    :param size: size of the matrix, i.e. (n_products, n_products)
-    :param fully_connected: if True, the matrix is fully connected, i.e. all products are connected to all other products
-    :return: a random product matrix
-    """
-    random_matrix = np.random.uniform(0.0, 1.0, size=size)
-    np.fill_diagonal(random_matrix, val=0.0)
-
-    if not fully_connected:
-        flatten_matrix = random_matrix.flatten()
-        indices_size = np.floor(len(flatten_matrix) * 0.2).astype(int)
-        indices = np.random.choice(range(len(flatten_matrix)), size=indices_size, replace=False)
-
-        flatten_matrix[indices] = 0.0
-        random_matrix = flatten_matrix.reshape(size)
-
-    return random_matrix
+        return random_matrix

@@ -1,4 +1,3 @@
-import itertools
 import random
 from collections import deque, namedtuple
 from typing import Any, Deque, Type, TypeVar, cast
@@ -13,10 +12,10 @@ from online_pricing.tracer import Tracer
 
 
 class Simulator(object):
-    def __init__(self, environment: Type[EnvironmentBase] = EnvironmentBase, seed: int = 0):
-        self.seed = seed  # TODO: use this
+    def __init__(self, environment: EnvironmentBase, learner: Type[Learner]):
+        self.seed = 0  # TODO: use this
         self.groups = range(3)
-        self.environment = environment()
+        self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
         self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
         self.prices = [
@@ -29,10 +28,10 @@ class Simulator(object):
         ]
         # start with the lowest prices
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
-        # lambda to go to second secondary product
+        # lambda to go to second secondary products
         self._lambda = self.environment._lambda
         self.learners: list[Learner] = [
-            TSLearner(n_arms=self.environment.n_products, prices=self.prices[idx])
+            learner(n_arms=self.environment.n_products, prices=self.prices[idx])
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence(
@@ -102,6 +101,8 @@ class Simulator(object):
         print_matrix(self.estimated_edge_probas)
         print("Product Graph:")
         print_matrix(self.environment.distributions_parameters["product_graph"][0])
+        print("Secondaries:")
+        print_matrix(self.secondaries, indexes=True)
         print("\n")
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
@@ -117,9 +118,7 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
-        buy_probability = self.environment.sample_demand_curve(
-            group=group, prod_id=product_id, price=price, uncertain=False
-        )  # TODO filippo we could make one simulator per step
+        buy_probability = self.environment.sample_demand_curve(group=group, prod_id=product_id, price=price)
         n_units = 0
         if random.random() <= buy_probability:
             n_units = self.environment.sample_quantity_bought(group)
@@ -294,8 +293,12 @@ class Simulator(object):
         """
         return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user
 
+    def plot(self) -> None:
+        """Plot the evolution of the objective function."""
+        self.tracer.plot()
 
-MATRIX = TypeVar("MATRIX", bound=list[int])
+
+MATRIX = TypeVar("MATRIX", list[int], list[list[int]])
 
 
 def sum_by_element(array_1: MATRIX, array_2: MATRIX, difference: bool = False) -> MATRIX:
@@ -319,5 +322,17 @@ def sum_by_element(array_1: MATRIX, array_2: MATRIX, difference: bool = False) -
     return [sum(items) for items in zip(array_1, array_2)]
 
 
-def print_matrix(matrix: list[list[float]]) -> None:
-    print("\n".join(["".join([f"{item:.2f} " for item in row]) for row in matrix]))
+def print_matrix(matrix: list[list[float | int]], indexes: bool = False) -> None:
+    if indexes:
+        indices = ["-"] + [str(i) for i in range(1, len(matrix[0]) + 1)]
+        new_matrix = [[str(matrix[j][i]) for i in range(len(matrix[0]))] for j in range(len(matrix))]
+        new_matrix.insert(0, indices)
+        for idx in range(1, len(new_matrix)):
+            new_matrix[idx].insert(0, str(idx))
+
+        print("\n".join(["".join([f"{item} " for item in row]) for row in new_matrix]))
+
+    elif type(matrix[0][0]) == int:
+        print("\n".join(["".join([f"{item} " for item in row]) for row in matrix]))
+    else:
+        print("\n".join(["".join([f"{item:.2f} " for item in row]) for row in matrix]))

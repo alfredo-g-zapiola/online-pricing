@@ -55,7 +55,7 @@ class SocialInfluence:
             [
                 min([1, self.learners[i][(0 if j == self.secondaries[i][0] else 1)].mean_arm(0) / 1])
                 # (1 if j == self.secondaries[i][0] else self.lambda_param)])
-                if j in self.secondaries[i] else 0
+                if j in self.secondaries[i] else 0.0
                 for j in range(5)
             ]
             for i in range(self.n_products)
