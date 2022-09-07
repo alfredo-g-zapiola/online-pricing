@@ -60,7 +60,7 @@ class EnvironmentBase:
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [700, 500, 200],  # we have more poor people than rich people
+            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
             "dirichlet_params": [  # alpha ratios
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
