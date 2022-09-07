@@ -70,7 +70,7 @@ class Simulator(object):
                 buys, influenced_episodes = self.sim_one_user(
                     group=group,
                     landing_product=primary_product,
-                    product_graph=self.environment.distributions_parameters["product_graph"][group].copy(),
+                    product_graph=self.environment.distributions_parameters["product_graph"][group].sample(),
                     prices=self.current_prices,
                 )
                 products_sold = sum_by_element(products_sold, buys)

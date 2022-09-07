@@ -9,6 +9,7 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 from online_pricing.influence_function import InfluenceFunctor
+from online_pricing.Wishart import WishartHandler
 
 
 class EnvironmentBase:
@@ -29,6 +30,7 @@ class EnvironmentBase:
         self.uncertain_demand_curve = hyperparameters.get("uncertain_demand_curve", False)
         self.uncertain_quantity_bought = hyperparameters.get("uncertain_quantity_bought", False)
         self.uncertain_graph_weights = hyperparameters.get("uncertain_graph_weights", False)
+        self.wishart_df = hyperparameters.get("wishart_df", 20)  # higher df, less uncertainty. Cannot be lower than n_products
 
         """
         Prices and margins: taken from the demand_curves.R we have the prices.
@@ -59,31 +61,18 @@ class EnvironmentBase:
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
             "n_people_params": [700, 500, 200],  # we have more poor people than rich people
-            "dirichlet_params": [
+            "dirichlet_params": [  # alpha ratios
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
                 np.asarray([5, 5, 9, 7, 7, 8]),
             ],
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 1.2, 1.8],
-            # product graph probabilities
-            "product_graph": [self.product_matrix(size=(n_products, n_products), fully_connected=self.fully_connected)]
-            * n_groups,  # end of product_graph matrices list
-            # A Wishart distribution is assumed for the product graph probabilities
-            "product_graph_params": {
-                "group 0": {
-                    "nu": 10,  # higher degrees of freedom, ...
-                    "matrix": np.array([[None, 0.1, 0.2, 0.15, 0.76], [0.2, None, 0.1, 0.15, 0.91]]),
-                },
-                "group 1": {
-                    "nu": 9,  # higher degrees of freedom, ...
-                    "matrix": np.array([[None, 0.1, 0.2, 0.15, 0.76], [0.2, None, 0.1, 0.15, 0.91]]),
-                },
-                "group 2": {
-                    "nu": 9,  # higher degrees of freedom, ...
-                    "matrix": np.array([[None, 0.1, 0.2, 0.15, 0.76], [0.2, None, 0.1, 0.15, 0.91]]),
-                },
-            }
+            # product graph probabilities, see the other file
+            "product_graph": [self.product_matrix(size=n_products, fully_connected=self.fully_connected,
+                                                  unif_params=(.2 + g*.1, .8 + g*.1))\
+                              for g in range(self.n_groups)],  # higher the groud id, richer it is, higher edge probas
+            # end of product_graph matrices list
             # N.B. client graph probabilities are included in the Social Influece class
         }
 
@@ -199,7 +188,7 @@ class EnvironmentBase:
             dirichlet_sample = [
                 np.random.dirichlet(self.distributions_parameters["dirichlet_params"][g]) for g in range(self.n_groups)
             ]
-        else:
+        else:  # compute expected value
             # we just take each element of the vector and divide it by the sum to get the expected value
             dirichlet_sample = [
                 self.distributions_parameters["dirichlet_params"][g]
@@ -249,8 +238,16 @@ class EnvironmentBase:
 
         :return: A list of n_products where for each product we have the two secondaries
         """
+        # first we have a weighed mean of the means of the product graphs
+        weighted_mean_p_graph = np.zeros((self.n_products, self.n_products))
+        for g in range(self.n_groups):
+            weighted_mean_p_graph += self.distributions_parameters["product_graph"][g].mean * self.distributions_parameters["n_people_params"][g]
+
+        weighted_mean_p_graph /= \
+            sum([self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)])
+
         return [
-            np.flip(np.argsort(self.distributions_parameters["product_graph"][0][i]))[:2].astype(int, copy=False)
+            np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False)
             for i in range(self.n_products)
         ]
 
@@ -280,30 +277,30 @@ class EnvironmentBase:
 
         return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
-    def product_matrix(self, size: tuple[int, int], fully_connected: bool = True) -> npt.NDArray[np.float64]:
+    def product_matrix(self, size: int, fully_connected: bool = True, unif_params = (.1, 1)) -> WishartHandler:
         """
         Generate random product matrix.
+        Note the higher the group number, the richer the population, and hence higher the edges.
+
+        We assume the product matrix to be a wishart distribution.
+        This is the distribution of a covariance matrix, which can easily be transformed into a correlation
+        matrix, so that all its elements are <= 1
+        The diagonal elements (which are all 1) will then be set to 0 as there is no influence of a product to
+        itself.
+        Cfr. https://stats.stackexchange.com/questions/22050/generating-correlation-matrices-using-wishart-distribution
+
 
         :param size: size of the matrix, i.e. (n_products, n_products)
         :param fully_connected: if True, the matrix is fully connected, i.e. all products are connected to all other products
+        :param group: bigger the group id, the richer the population, the higher in mean the product graph
+        :param unif_params
         :return: a random product matrix
         """
-        if self.uncertain_graph_weights:
-            # TODO(flavio) qua fai uncertain
-            pass
-        else:
-            random_matrix = np.random.uniform(0.5, 0.51, size=size)
-        np.fill_diagonal(random_matrix, val=0.0)
 
-        if not fully_connected:
-            flatten_matrix = random_matrix.flatten()
-            indices_size = int(np.floor(len(flatten_matrix) * 0.60))  # 60% of the matrix is zeroed
-            indices = np.random.choice(range(len(flatten_matrix)), size=indices_size, replace=False)
+        return WishartHandler(size=size, df=self.wishart_df, unif_params=unif_params, uncertain=self.uncertain_graph_weights,
+                              fully_connected=fully_connected, seed=2200337)
 
-            flatten_matrix[indices] = 0.0
-            random_matrix = flatten_matrix.reshape(size)
 
-        return random_matrix
 
     def compute_clairvoyant(self):
         """
