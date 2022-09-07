@@ -17,6 +17,7 @@ class Simulator(object):
         self.groups = range(3)
         self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
+        print("Secondaires are:\n", self.secondaries)
         self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
         self.prices = [
             [price_and_margin[0] for price_and_margin in prices_and_margins]
@@ -100,7 +101,7 @@ class Simulator(object):
         print("Estimated edge probabilities:")
         print_matrix(self.estimated_edge_probas)
         print("Product Graph:")
-        print_matrix(self.environment.distributions_parameters["product_graph"][0])
+        print_matrix(self.environment.mean_product_graph)
         print("Secondaries:")
         print_matrix(self.secondaries, indexes=True)
         print("\n")

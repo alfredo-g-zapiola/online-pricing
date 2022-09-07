@@ -35,13 +35,17 @@ class WishartHandler(object):
                                                    self.cov2corr(self.wisharts[1].scale)])
         self.to_disconnect = [row for row in range(self.size) if np.random.random() <= self.zero_pct]
         self.mean = self.mean if self.fully_connected else self.disconnect(self.mean)
+        np.fill_diagonal(self.mean, val=-1.)  # the diagonal has to be -1: a product does not influence itself!
+
 
     def sample(self):
         if self.uncertain:
             samples = [self.cov2corr(wish.rvs()) for wish in self.wisharts]
-            print(samples)
             prod_graph = self.generate_product_graph(samples)
-            return prod_graph if self.fully_connected else self.disconnect(prod_graph)
+            prod_graph = prod_graph if self.fully_connected else self.disconnect(prod_graph)
+            np.fill_diagonal(prod_graph, val=-1)
+            return prod_graph
+
         else:
             return self.mean  # if fully connected or not already addressed at the init
 
@@ -70,7 +74,6 @@ class WishartHandler(object):
         sample = np.zeros((self.size,self.size))
         sample += np.triu(wish_samples[0]) # add the first wishart to the upper triangle
         sample += np.tril(wish_samples[1])
-        np.fill_diagonal(sample, val=0.)  # the diagonal has to be zero: a product does not influence itself!
         return sample
 
 

@@ -75,8 +75,9 @@ class EnvironmentBase:
             # end of product_graph matrices list
             # N.B. client graph probabilities are included in the Social Influece class
         }
-
+        self.mean_product_graph = None
         self._influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
+
         # TODO: use this
         # function covariance parameters
         # higher alpha, higher ...
@@ -245,7 +246,7 @@ class EnvironmentBase:
 
         weighted_mean_p_graph /= \
             sum([self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)])
-
+        self.mean_product_graph = weighted_mean_p_graph
         return [
             np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False)
             for i in range(self.n_products)
@@ -336,12 +337,20 @@ class EnvironmentBase:
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
                 g_reward = 0.0
+                influence_function = np.zeros(shape=(self.n_products, self.n_products))
+
+                # compute the influence function values for this group at this price
+                for p1 in range(self.n_products):
+                    for p2 in [i for i in range(self.n_products) if i != p1]:
+                        influence_function[p1, p2] = self._influence_functor(p1, p2, c_rate,
+                                                                             self.distributions_parameters["product_graph"][g].mean)
+
                 for p in range(self.n_products):  # for each starting product
                     g_reward += expected_alpha_r[g][p + 1] * (  # plus one since 0 corresponds to leaving the website
                         c_rate(p) * price_and_margin(p)[1] * quantity
                         + sum(
                             [
-                                self._influence_functor(p, p2, c_rate, self.distributions_parameters["product_graph"][g])
+                               influence_function[p, p2]
                                 * c_rate(p2)
                                 * price_and_margin(p2)[1]
                                 * quantity
