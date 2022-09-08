@@ -255,7 +255,7 @@ class EnvironmentBase:
         self.mean_product_graph = weighted_mean_p_graph
         return [np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False) for i in range(self.n_products)]
 
-    def yield_expected_alpha(self) -> list[float]:
+    def yield_expected_alpha(self) -> list[float] | list[list[float]]:
         """
         It is assumed the simulator knows the expected values of the alpha ratios.
 
@@ -324,7 +324,7 @@ class EnvironmentBase:
         self.uncertain_demand_curve = False  # so we take the mean value
         push_alpha_context = self.context_generation
         self.context_generation = True
-        expected_alpha_r = self.yield_expected_alpha()
+        expected_alpha_r = cast(list[list[float]], self.yield_expected_alpha())
 
         rewards = {}
         maximum = 0.0
@@ -336,14 +336,13 @@ class EnvironmentBase:
             cur_reward = 0.0
             price_and_margin = lambda p: self.prices_and_margins[self.product_id_map[p]][price_config[p]]
 
-            def c_rate(p):
+            def c_rate(product: int) -> float:
                 """Compute the conversion rate fixed with fixed group and prices.
                 This is why the function is redefined daily"""
-                return self.sample_demand_curve(group=g, prod_id=p, price=price_and_margin(p)[0])
+                return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0])
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
-                g_reward = 0.0
                 influence_function = np.zeros(shape=(self.n_products, self.n_products))
 
                 # compute the influence function values for this group at this price
@@ -353,17 +352,26 @@ class EnvironmentBase:
                             p1, p2, c_rate, self.distributions_parameters["product_graph"][g].mean
                         )
 
-                for p in range(self.n_products):  # for each starting product
-                    g_reward += expected_alpha_r[g][p + 1] * (  # plus one since 0 corresponds to leaving the website
-                        c_rate(p) * price_and_margin(p)[1] * quantity
-                        + sum(
-                            [
-                                influence_function[p, p2] * c_rate(p2) * price_and_margin(p2)[1] * quantity
-                                for p2 in range(self.n_products)
-                                if p2 != p
-                            ]
+                g_reward = sum(
+                    [
+                        expected_alpha_r[g][product_id + 1]
+                        * (  # plus one since 0 corresponds to leaving the website
+                            c_rate(product_id) * price_and_margin(product_id)[1] * quantity
+                            + sum(
+                                [
+                                    influence_function[product_id, secondary_product]
+                                    * c_rate(secondary_product)
+                                    * price_and_margin(secondary_product)[1]
+                                    * quantity
+                                    for secondary_product in range(self.n_products)
+                                    if secondary_product != product_id
+                                ]
+                            )
                         )
-                    )
+                        for product_id in range(self.n_products)
+                    ]
+                )
+
                 cur_reward += (
                     g_reward * self.distributions_parameters["n_people_params"][g]
                 )  # weight it according to number of people
