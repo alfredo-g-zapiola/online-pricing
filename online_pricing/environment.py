@@ -1,5 +1,5 @@
 import itertools
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import numpy as np
 import numpy.typing as npt

@@ -6,7 +6,6 @@ from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner, UCBLearner
 from online_pricing.simulator import Simulator
 
-# TODO(FIL): fix clairvoyant performance
 # TODO(FIL): context generation
 
 

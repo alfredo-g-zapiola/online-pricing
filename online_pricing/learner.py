@@ -90,3 +90,64 @@ class TSLearner(Learner):
         :return: the mean of the beta distribution
         """
         return float(self.beta_parameters[arm_id, 0] / (self.beta_parameters[arm_id, 0] + self.beta_parameters[arm_id, 1]))
+
+
+class SWUCBLearner(UCBLearner):
+    def __init__(self, n_arms: int, prices: list[float], window_size: int):
+        super().__init__(n_arms, prices)
+        self.window_size = window_size
+
+    def update(self, arm_pulled: int, reward: int) -> None:
+        self.t += 1
+        self.rewards.append(reward)
+        self.rewards_per_arm[arm_pulled].append(reward)
+        self.pulled_arms.append(arm_pulled)
+
+        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled][-self.window_size :])
+        for idx in range(self.n_arms):
+            n = len(self.rewards_per_arm[idx][-self.window_size :])
+            if n > 0:
+                self.widths[idx] = np.sqrt(2 * np.max(self.prices) * np.log(self.t) / n)
+            else:
+                self.widths[idx] = np.inf
+
+
+# https://arxiv.org/pdf/1802.03692.pdf
+class MUCB(UCBLearner):
+    def __init__(self, n_arms: int, prices: list[float], w: int, beta: int, gamma: int) -> None:
+        super().__init__(n_arms, prices)
+        assert w > 0 & beta > 0 & gamma >= 0 & gamma <= 1
+        self.w = w
+        self.beta = beta
+        self.gamma = gamma
+        self.detections = [0]
+        self.last_detection = 0
+
+    def update(self, arm_pulled: int, reward: int) -> None:
+        super(UCBLearner, self).update(arm_pulled, reward)
+
+        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled])
+        for idx in range(self.n_arms):
+            n = len(self.rewards_per_arm[idx])
+            if n > 0:
+                self.widths[idx] = np.sqrt(2 * np.max(self.prices) * np.log(self.t - self.last_detection) / n)
+
+            else:
+                self.widths[idx] = np.inf
+
+        if len(self.rewards_per_arm[arm_pulled]) > self.w:
+            if self.change_detection(self.rewards_per_arm[arm_pulled]):
+                self.last_detection = self.t
+                self.detections.append(self.t)
+                for idx in range(self.n_arms):
+                    self.rewards_per_arm[idx] = []
+
+    def change_detection(self, observations: list[int]) -> bool:
+        if sum(observations[np.floor(-self.w / 2) + 1 :]) - sum(observations[: np.floor(self.w / 2)]) > self.beta:
+            return True
+
+        return False
+
+    def act(self) -> int:
+        idx = np.argmax((self.means + self.widths))
+        return int(idx)
