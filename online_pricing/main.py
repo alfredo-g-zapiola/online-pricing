@@ -6,6 +6,9 @@ from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner, UCBLearner
 from online_pricing.simulator import Simulator
 
+# TODO(FIL): fix clairvoyant performance
+# TODO(FIL): context generation
+
 
 @click.command()
 @click.option(
@@ -33,7 +36,7 @@ def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_
                 hyperparameters={
                     "fully_connected": fully_connected,
                     "context_generation": False,
-                    "uncertain_alpha": True,
+                    "uncertain_alpha": False,
                     "group_unknown": True,
                     "lambda": 0.5,
                     "uncertain_demand_curve": False,
@@ -48,7 +51,7 @@ def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_
                 hyperparameters={
                     "fully_connected": fully_connected,
                     "context_generation": False,
-                    "uncertain_alpha": False,
+                    "uncertain_alpha": True,
                     "group_unknown": True,
                     "lambda": 0.5,
                     "uncertain_demand_curve": False,

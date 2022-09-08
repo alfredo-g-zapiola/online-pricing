@@ -30,7 +30,9 @@ class EnvironmentBase:
         self.uncertain_demand_curve = hyperparameters.get("uncertain_demand_curve", False)
         self.uncertain_quantity_bought = hyperparameters.get("uncertain_quantity_bought", False)
         self.uncertain_graph_weights = hyperparameters.get("uncertain_graph_weights", False)
-        self.wishart_df = hyperparameters.get("wishart_df", 20)  # higher df, less uncertainty. Cannot be lower than n_products
+        self.wishart_df = hyperparameters.get(
+            "wishart_df", 20
+        )  # higher df, less uncertainty. Cannot be lower than n_products
 
         """
         Prices and margins: taken from the demand_curves.R we have the prices.
@@ -69,9 +71,12 @@ class EnvironmentBase:
             # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 1.2, 1.8],
             # product graph probabilities, see the other file
-            "product_graph": [self.product_matrix(size=n_products, fully_connected=self.fully_connected,
-                                                  unif_params=(.2 + g*.1, .8 + g*.1))\
-                              for g in range(self.n_groups)],  # higher the groud id, richer it is, higher edge probas
+            "product_graph": [
+                self.product_matrix(
+                    size=n_products, fully_connected=self.fully_connected, unif_params=(0.2 + g * 0.1, 0.8 + g * 0.1)
+                )
+                for g in range(self.n_groups)
+            ],  # higher the groud id, richer it is, higher edge probas
             # end of product_graph matrices list
             # N.B. client graph probabilities are included in the Social Influece class
         }
@@ -242,15 +247,13 @@ class EnvironmentBase:
         # first we have a weighed mean of the means of the product graphs
         weighted_mean_p_graph = np.zeros((self.n_products, self.n_products))
         for g in range(self.n_groups):
-            weighted_mean_p_graph += self.distributions_parameters["product_graph"][g].mean * self.distributions_parameters["n_people_params"][g]
+            weighted_mean_p_graph += (
+                self.distributions_parameters["product_graph"][g].mean * self.distributions_parameters["n_people_params"][g]
+            )
 
-        weighted_mean_p_graph /= \
-            sum([self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)])
+        weighted_mean_p_graph /= sum([self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)])
         self.mean_product_graph = weighted_mean_p_graph
-        return [
-            np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False)
-            for i in range(self.n_products)
-        ]
+        return [np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False) for i in range(self.n_products)]
 
     def yield_expected_alpha(self) -> list[float]:
         """
@@ -278,7 +281,7 @@ class EnvironmentBase:
 
         return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
-    def product_matrix(self, size: int, fully_connected: bool = True, unif_params = (.1, 1)) -> WishartHandler:
+    def product_matrix(self, size: int, fully_connected: bool = True, unif_params=(0.1, 1)) -> WishartHandler:
         """
         Generate random product matrix.
         Note the higher the group number, the richer the population, and hence higher the edges.
@@ -298,10 +301,14 @@ class EnvironmentBase:
         :return: a random product matrix
         """
 
-        return WishartHandler(size=size, df=self.wishart_df, unif_params=unif_params, uncertain=self.uncertain_graph_weights,
-                              fully_connected=fully_connected, seed=2200337)
-
-
+        return WishartHandler(
+            size=size,
+            df=self.wishart_df,
+            unif_params=unif_params,
+            uncertain=self.uncertain_graph_weights,
+            fully_connected=fully_connected,
+            seed=2200337,
+        )
 
     def compute_clairvoyant(self):
         """
@@ -342,18 +349,16 @@ class EnvironmentBase:
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
                     for p2 in [i for i in range(self.n_products) if i != p1]:
-                        influence_function[p1, p2] = self._influence_functor(p1, p2, c_rate,
-                                                                             self.distributions_parameters["product_graph"][g].mean)
+                        influence_function[p1, p2] = self._influence_functor(
+                            p1, p2, c_rate, self.distributions_parameters["product_graph"][g].mean
+                        )
 
                 for p in range(self.n_products):  # for each starting product
                     g_reward += expected_alpha_r[g][p + 1] * (  # plus one since 0 corresponds to leaving the website
                         c_rate(p) * price_and_margin(p)[1] * quantity
                         + sum(
                             [
-                               influence_function[p, p2]
-                                * c_rate(p2)
-                                * price_and_margin(p2)[1]
-                                * quantity
+                                influence_function[p, p2] * c_rate(p2) * price_and_margin(p2)[1] * quantity
                                 for p2 in range(self.n_products)
                                 if p2 != p
                             ]

@@ -1,6 +1,7 @@
-from scipy.stats import wishart
-from scipy.linalg import toeplitz
 import numpy as np
+from scipy.linalg import toeplitz
+from scipy.stats import wishart
+
 
 class WishartHandler(object):
     """
@@ -10,33 +11,33 @@ class WishartHandler(object):
     for the lower-left another one; both initialised from the same toeplitz matrix which takes as input
     an ordered uniform sample
     """
-    def __init__(self, size, df, unif_params,  uncertain, fully_connected, seed):
+
+    def __init__(self, size, df, unif_params, uncertain, fully_connected, seed):
         np.random.seed(seed)
         self.size = size
         self.df = df
         first_rows = [  # to initialise the wishart distributions!
-                    np.flip(np.sort(np.random.uniform(size=size, low=unif_params[0], high=unif_params[1]))),
-                      np.flip(np.sort(np.random.uniform(size=size, low=unif_params[0], high=unif_params[1])))
-                      ]
+            np.flip(np.sort(np.random.uniform(size=size, low=unif_params[0], high=unif_params[1]))),
+            np.flip(np.sort(np.random.uniform(size=size, low=unif_params[0], high=unif_params[1]))),
+        ]
         first_rows[0][0] = 1  # set the highest values to 1 (this has to do with eigenvalues of the cov matrix)
         first_rows[1][0] = 1
 
         # to make the product graph, we have two wishart matrices (initialised by two toeplitz matrices
         # which are initialised by two different vectors which are samples of a same uniform distribution)
         # that uniform distribution depends on the group: richer people means higher values
-        self.wisharts = [wishart(self.df, toeplitz(first_rows[0])),
-                         wishart(self.df, toeplitz(first_rows[1]))]
+        self.wisharts = [wishart(self.df, toeplitz(first_rows[0])), wishart(self.df, toeplitz(first_rows[1]))]
         self.uncertain = uncertain
         self.fully_connected = fully_connected
-        self.zero_pct = .60  # percentage of the edges to set to 0
+        self.zero_pct = 0.60  # percentage of the edges to set to 0
 
         # obtain mean:
-        self.mean = self.generate_product_graph([self.cov2corr(self.wisharts[0].scale*self.df),
-                                                   self.cov2corr(self.wisharts[1].scale)])
+        self.mean = self.generate_product_graph(
+            [self.cov2corr(self.wisharts[0].scale * self.df), self.cov2corr(self.wisharts[1].scale)]
+        )
         self.to_disconnect = [row for row in range(self.size) if np.random.random() <= self.zero_pct]
         self.mean = self.mean if self.fully_connected else self.disconnect(self.mean)
-        np.fill_diagonal(self.mean, val=-1.)  # the diagonal has to be -1: a product does not influence itself!
-
+        np.fill_diagonal(self.mean, val=-1.0)  # the diagonal has to be -1: a product does not influence itself!
 
     def sample(self):
         if self.uncertain:
@@ -60,7 +61,6 @@ class WishartHandler(object):
         S_minus_1 = np.linalg.inv(np.sqrt(np.diag(np.diag(cov_matrix))))  # yes, we need np.diag twice
         return S_minus_1 @ cov_matrix @ S_minus_1
 
-
     def generate_product_graph(self, wish_samples):
         """
 
@@ -71,11 +71,10 @@ class WishartHandler(object):
         :return:
         """
 
-        sample = np.zeros((self.size,self.size))
-        sample += np.triu(wish_samples[0]) # add the first wishart to the upper triangle
+        sample = np.zeros((self.size, self.size))
+        sample += np.triu(wish_samples[0])  # add the first wishart to the upper triangle
         sample += np.tril(wish_samples[1])
         return sample
-
 
     def disconnect(self, random_matrix):
         """
@@ -87,9 +86,6 @@ class WishartHandler(object):
             if row_index in self.to_disconnect:
                 random_matrix[row_index] *= 0
         return random_matrix
-
-
-
 
         # flatten_matrix = random_matrix.flatten()
         # indices_size = int(np.floor(len(flatten_matrix) * 0.60))  # 60% of the matrix is zeroed

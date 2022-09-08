@@ -87,8 +87,9 @@ class Simulator(object):
             for product_id, idx in enumerate(self.current_prices)
         ]
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
-        self.tracer.add_measurement(mean_reward_per_client)
+        learner_data = self.get_learner_data()
 
+        self.tracer.add_measurement(mean_reward_per_client, learner_data)
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
@@ -297,6 +298,14 @@ class Simulator(object):
     def plot(self) -> None:
         """Plot the evolution of the objective function."""
         self.tracer.plot()
+
+    def get_learner_data(self) -> list[list[float]]:
+        """
+        Get the data of the learners.
+
+        :return: list of list of data.
+        """
+        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
 
 
 MATRIX = TypeVar("MATRIX", list[int], list[list[int]])
