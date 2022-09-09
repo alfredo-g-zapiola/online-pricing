@@ -47,7 +47,7 @@ class Simulator(object):
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
         self.reward_tracer = Tracer()
         self.regret_tracer = Regret(optimum=self.environment.yield_clairvoyant())
-
+        self.n_day = 0
     def sim_one_day(self) -> None:
         """
         Simulate what happens in one day.
@@ -108,6 +108,7 @@ class Simulator(object):
         print("Secondaries:")
         print_matrix(self.secondaries, indexes=True)
         print("\n")
+        self.n_day += 1
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """

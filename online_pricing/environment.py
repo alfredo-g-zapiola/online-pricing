@@ -127,7 +127,7 @@ class EnvironmentBase:
     # def sample_affinity(self, prod_id, group, first=True):
     #     return np.random.uniform(0, 1)
 
-    def sample_demand_curve(self, group: int, prod_id: int, price: float) -> float:
+    def sample_demand_curve(self, group: int, prod_id: int, price: float, n_day: int = 0) -> float:
         """
 
         :param group: the id of the group
@@ -160,7 +160,16 @@ class EnvironmentBase:
                 f_name = prod_name + "_rich"
             case _:
                 raise ValueError("Invalid group id")
+        def apply_shift(c_rate):
+            if not self.uncertain_demand_curve:
+                return c_rate
+            else:
+                if n_day > 15 and n_day <= 30:
+                    c_rate = np.clip(c_rate * 1.5, 0, 1)
+                elif n_day > 45:
+                    c_rate = np.clip(c_rate * 0.5, 0, 1)
 
+        c_rate: float  = 0
         if self.uncertain_demand_curve:
             robjects.r(
                 """
@@ -169,11 +178,11 @@ class EnvironmentBase:
                     f_name, price
                 )
             )
-            return float(robjects.r("d")[0])
+            return apply_shift(float(robjects.r("d")[0]))
         else:
             curve_f = robjects.r["{}".format(f_name)]
             clipper = robjects.r["clipper.f"]
-            return float(clipper(curve_f(price)[0])[0])
+            return apply_shift(float(clipper(curve_f(price)[0])[0]))
 
     def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
         """

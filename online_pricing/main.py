@@ -19,6 +19,9 @@ from online_pricing.DataWrapper import DataWrapper
 @click.option("--learner", "-l", default="TS", help="The learner to use.")
 @click.option("--no-plot", "-p", is_flag=True, help="Whether to avoid plotting the results.")
 @click.option("--n-samples", "-ns", default=30, help="How many simulations we carry out")
+@click.option("--uncertain-params", "up", default=True, help="If the distributions are uncertain,i.e."
+                                                             "if we sample from them at the decisioning process."
+                                                             "Else we take expected values")
 def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_plot: bool,n_samples:int) -> None:
 
     # TODO: generalize this
@@ -74,7 +77,23 @@ def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_
                     "uncertain_quantity_bought": False,
                     "uncertain_product_weights": True,
                 },
-            )
+            ),
+        case 7:
+            environment = EnvironmentBase(
+                n_products=5,
+                n_groups=3,
+                hyperparameters={
+                    "fully_connected": fully_connected,
+                    "context_generation": False,
+                    "uncertain_alpha": False,
+                    "group_unknown": True,
+                    "lambda": 0.5,
+                    "uncertain_demand_curve": False,
+                    "uncertain_quantity_bought": False,
+                    "uncertain_product_weights": True,
+                    "shifting_demand_curve": True
+                },
+            ),
 
         case _:
             raise ValueError(f"Step {step} does not exists.")
