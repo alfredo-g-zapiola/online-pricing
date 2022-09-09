@@ -6,6 +6,16 @@ from matplotlib.gridspec import GridSpec
 from scipy import interpolate
 
 
+def moving_average(avg_rewards) -> list[float]:
+    window = 7
+    average = []
+    for idx in range(len(avg_rewards) - window + 1):
+        average.append(np.mean(avg_rewards[idx: idx + window]))
+    for idx in range(window - 1):
+        average.insert(idx, np.mean(avg_rewards[0: 0 + idx]))
+
+    return average
+
 class Tracer:
     def __init__(self) -> None:
         self.avg_reward = list[float]()
@@ -16,7 +26,7 @@ class Tracer:
         self.arm_data.append(arm_data)
 
     def plot(self) -> None:
-        moving_average = self.moving_average()
+        ma = moving_average(self.avg_reward)
         plt.figure()
         plt.plot(
             self.avg_reward,
@@ -25,7 +35,7 @@ class Tracer:
             linewidth=0.75,
         )
         plt.plot(
-            moving_average,
+            ma,
             label="Moving Average",
             color="red",
         )
@@ -69,12 +79,4 @@ class Tracer:
 
         plt.show()
 
-    def moving_average(self) -> list[float]:
-        window = 7
-        average = []
-        for idx in range(len(self.avg_reward) - window + 1):
-            average.append(np.mean(self.avg_reward[idx : idx + window]))
-        for idx in range(window - 1):
-            average.insert(idx, np.mean(self.avg_reward[0 : 0 + idx]))
 
-        return average

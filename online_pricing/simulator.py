@@ -9,11 +9,11 @@ from online_pricing.influence_function import InfluenceFunctor
 from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
-
+from online_pricing.regret import Regret
 
 class Simulator(object):
-    def __init__(self, environment: EnvironmentBase, learner: Type[Learner]):
-        self.seed = 0  # TODO: use this
+    def __init__(self, environment: EnvironmentBase, learner: Type[Learner], seed: int):
+        self.seed = seed  # TODO: use this
         self.groups = range(3)
         self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
@@ -45,7 +45,8 @@ class Simulator(object):
             for i in range(self.environment.n_products)
         ]
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
-        self.tracer = Tracer()
+        self.reward_tracer = Tracer()
+        self.regret_tracer = Regret(optimum=self.environment.yield_clairvoyant())
 
     def sim_one_day(self) -> None:
         """
@@ -89,7 +90,8 @@ class Simulator(object):
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         learner_data = self.get_learner_data()
 
-        self.tracer.add_measurement(mean_reward_per_client, learner_data)
+        self.reward_tracer.add_measurement(mean_reward_per_client, learner_data)
+        self.regret_tracer.add_measurement(mean_reward_per_client, learner_data)
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
@@ -297,7 +299,8 @@ class Simulator(object):
 
     def plot(self) -> None:
         """Plot the evolution of the objective function."""
-        self.tracer.plot()
+        self.reward_tracer.plot()
+        self.regret_tracer.plot()
 
     def get_learner_data(self) -> list[list[float]]:
         """

@@ -33,6 +33,7 @@ class EnvironmentBase:
         self.wishart_df = hyperparameters.get(
             "wishart_df", 20
         )  # higher df, less uncertainty. Cannot be lower than n_products
+        self.shifting_demand_curve = hyperparameters.get("shifting_demand_curve", False)
 
         """
         Prices and margins: taken from the demand_curves.R we have the prices.
@@ -392,3 +393,13 @@ class EnvironmentBase:
         self.clairvoyant = {max_arm: maximum}
 
         return rewards, max_arm
+
+    def yield_clairvoyant(self):
+        """
+        Clairvoyant is hard-coded since it takes 30 mins to compute it
+        :return:
+        """
+        if not self.shifting_demand_curve:
+            return 19.08163728705  # with arm (1,1,3,1,1)
+        else:
+            return (19.08163728705, None, None)

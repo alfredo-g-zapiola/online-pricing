@@ -5,19 +5,21 @@ import click
 from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import Learner, TSLearner, UCBLearner
 from online_pricing.simulator import Simulator
+from online_pricing.DataWrapper import DataWrapper
 
 # TODO(FIL): context generation
 
 
 @click.command()
 @click.option(
-    "--step", "-s", default=None, help="The step of the simulation, as defined in the project description.", type=int
+    "--step", "-s", default=None, help="The step o  f the simulation, as defined in the project description.", type=int
 )
 @click.option("--fully-connected", "-fc", is_flag=True, help="Whether to use a fully connected product graph.")
 @click.option("--n-days", "-n", default=1000, help="The number of days to simulate.")
 @click.option("--learner", "-l", default="TS", help="The learner to use.")
 @click.option("--no-plot", "-p", is_flag=True, help="Whether to avoid plotting the results.")
-def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_plot: bool) -> None:
+@click.option("--n-samples", "-ns", default=30, help="How many simulations we carry out")
+def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_plot: bool,n_samples:int) -> None:
 
     # TODO: generalize this
     n_arms = 5
@@ -86,16 +88,25 @@ def main(step: int | None, fully_connected: bool, n_days: int, learner: str, no_
         case _:
             raise ValueError(f"Learner {learner} does not exists.")
 
-    simulator = Simulator(environment=environment, learner=learner_class)
+    n_samples: int = n_samples if n_samples is not None else 30
+
 
     try:
-        for i in range(n_days):
-            simulator.sim_one_day()
+        dw = DataWrapper(n_samples, n_days)
+        for n in range(n_samples):
+            simulator = Simulator(environment=environment, learner=learner_class, seed = int(n*4314))
+            for i in range(n_days):
+                simulator.sim_one_day()
+            dw.add_measurements(rewards=simulator.reward_tracer.avg_reward,
+                                regrets=simulator.regret_tracer.avg_reward,
+                                sample=n)
     except KeyboardInterrupt:
         print(" !===============! Interrupted !===============! ")
 
     if not no_plot:
         simulator.plot()
+        dw.plot_all()
+
 
 
 if __name__ == "__main__":
