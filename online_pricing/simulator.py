@@ -1,18 +1,18 @@
 import random
 from collections import deque, namedtuple
-from typing import Any, Deque, Type, TypeVar, cast
+from typing import Any, Deque, Type, TypeVar
 
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase
 from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.learner import Learner, TSLearner
+from online_pricing.learner import Learner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
-from online_pricing.regret import Regret
+
 
 class Simulator(object):
-    def __init__(self, environment: EnvironmentBase, learner: Type[Learner], seed: int):
+    def __init__(self, environment: EnvironmentBase, seed: int, tracer: Tracer):
         self.seed = seed  # TODO: use this
         self.groups = range(3)
         self.environment = environment
@@ -32,7 +32,7 @@ class Simulator(object):
         # lambda to go to second secondary products
         self._lambda = self.environment._lambda
         self.learners: list[Learner] = [
-            learner(n_arms=self.environment.n_products, prices=self.prices[idx])
+            environment.learner_class(n_arms=self.environment.n_products, prices=self.prices[idx])
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence(
@@ -45,9 +45,9 @@ class Simulator(object):
             for i in range(self.environment.n_products)
         ]
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
-        self.reward_tracer = Tracer()
-        self.regret_tracer = Regret(optimum=self.environment.yield_clairvoyant())
+        self.reward_tracer = tracer
         self.n_day = 0
+
     def sim_one_day(self) -> None:
         """
         Simulate what happens in one day.
@@ -90,8 +90,9 @@ class Simulator(object):
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         learner_data = self.get_learner_data()
 
-        self.reward_tracer.add_measurement(mean_reward_per_client, learner_data)
-        self.regret_tracer.add_measurement(mean_reward_per_client, learner_data)
+        self.reward_tracer.add_avg_reward(mean_reward_per_client)
+        self.reward_tracer.add_arm_data(learner_data)
+
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
@@ -123,7 +124,9 @@ class Simulator(object):
         :param price: price of the product
         :return: number of units bought
         """
-        buy_probability = self.environment.sample_demand_curve(group=group, prod_id=product_id, price=price)
+        buy_probability = self.environment.sample_demand_curve(
+            group=group, prod_id=product_id, price=price, n_day=self.n_day
+        )
         n_units = 0
         if random.random() <= buy_probability:
             n_units = self.environment.sample_quantity_bought(group)
@@ -297,11 +300,6 @@ class Simulator(object):
         :return: reward for the user.
         """
         return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user if n_user > 0 else 0
-
-    def plot(self) -> None:
-        """Plot the evolution of the objective function."""
-        self.reward_tracer.plot()
-        self.regret_tracer.plot()
 
     def get_learner_data(self) -> list[list[float]]:
         """

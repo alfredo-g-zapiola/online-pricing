@@ -9,7 +9,8 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.Wishart import WishartHandler
+from online_pricing.learner import TSLearner
+from online_pricing.wishart import WishartHandler
 
 
 class EnvironmentBase:
@@ -23,6 +24,7 @@ class EnvironmentBase:
 
         # Hyperparameters
         self.fully_connected = hyperparameters.get("fully_connected", True)
+        self.learner_class = hyperparameters.get("learner_class", TSLearner)
         self.context_generation = hyperparameters.get("context_generation", False)
         self.uncertain_alpha = hyperparameters.get("uncertain_alpha", False)
         self.group_unknown = hyperparameters.get("group_unknown", True)
@@ -160,6 +162,7 @@ class EnvironmentBase:
                 f_name = prod_name + "_rich"
             case _:
                 raise ValueError("Invalid group id")
+
         def apply_shift(c_rate):
             if not self.uncertain_demand_curve:
                 return c_rate
@@ -169,7 +172,7 @@ class EnvironmentBase:
                 elif n_day > 45:
                     c_rate = np.clip(c_rate * 0.5, 0, 1)
 
-        c_rate: float  = 0
+        c_rate: float = 0
         if self.uncertain_demand_curve:
             robjects.r(
                 """
