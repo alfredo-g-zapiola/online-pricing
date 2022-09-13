@@ -36,7 +36,10 @@ class EnvironmentBase:
             "wishart_df", 20
         )  # higher df, less uncertainty. Cannot be lower than n_products
         self.shifting_demand_curve = hyperparameters.get("shifting_demand_curve", False)
-
+        self.unknown_demand_curve = hyperparameters.get("unknown_demand_curve", True)
+        self.unknown_quantity_bought = hyperparameters.get("unknown_quantity_bought", True)
+        self.unknown_product_weights = hyperparameters.get("unknown_product_weights", True)
+        print(hyperparameters)
         """
         Prices and margins: taken from the demand_curves.R we have the prices.
         We assume the cost to be the 40% of the standard price, so that when there is 40% discount,
@@ -84,17 +87,14 @@ class EnvironmentBase:
             # N.B. client graph probabilities are included in the Social Influece class
         }
         self.mean_product_graph = None
-        self._influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
-
-        # TODO: use this
-        # function covariance parameters
-        # higher alpha, higher ...
-        # self.__alpha_demand = 0
-        # higher beta, higher ...
-        # self.__beta_demand = 0
+        self.influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
 
         # initialise R session
         self._init_r()
+        self.group_proportions = list(range(self.n_groups))
+        for g in range(self.n_groups):
+            self.group_proportions[g] = self.distributions_parameters["n_people_params"][g] / \
+                                        sum(self.distributions_parameters["n_people_params"])
 
         # value the objective function
         self.rewards = dict()
@@ -164,15 +164,15 @@ class EnvironmentBase:
                 raise ValueError("Invalid group id")
 
         def apply_shift(c_rate):
-            if not self.uncertain_demand_curve:
+            if not self.shifting_demand_curve:
                 return c_rate
             else:
                 if n_day > 15 and n_day <= 30:
                     c_rate = np.clip(c_rate * 1.5, 0, 1)
-                elif n_day > 45:
+                elif n_day > 30:
                     c_rate = np.clip(c_rate * 0.5, 0, 1)
+                return c_rate
 
-        c_rate: float = 0
         if self.uncertain_demand_curve:
             robjects.r(
                 """
@@ -181,7 +181,7 @@ class EnvironmentBase:
                     f_name, price
                 )
             )
-            return apply_shift(float(robjects.r("d")[0]))
+            return apply_shift((robjects.r("d")[0]))
         else:
             curve_f = robjects.r["{}".format(f_name)]
             clipper = robjects.r["clipper.f"]
@@ -361,7 +361,7 @@ class EnvironmentBase:
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
                     for p2 in [i for i in range(self.n_products) if i != p1]:
-                        influence_function[p1, p2] = self._influence_functor(
+                        influence_function[p1, p2] = self.influence_functor(
                             p1, p2, c_rate, self.distributions_parameters["product_graph"][g].mean
                         )
 

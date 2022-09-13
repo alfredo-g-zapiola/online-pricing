@@ -62,7 +62,7 @@ class Simulator(object):
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int] = [0] * self.environment.n_products
         n_users = 0
-
+        print("Simulating clients")
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
                 if primary_product == -1:
@@ -79,8 +79,9 @@ class Simulator(object):
 
                 self.update_learners(buys=buys, prices=self.current_prices)
                 self.social_influence.add_episode(influenced_episodes)
-
+        # Estimate probabilities
         # Regret calculator
+        print("Estimating edge probas")
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         current_margins = [
@@ -92,7 +93,7 @@ class Simulator(object):
 
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
-
+        print("Calling greedy algorithm")
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
@@ -209,16 +210,34 @@ class Simulator(object):
         for idx, bought in enumerate(did_buy):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
-    def conversion_rate(self, product_id: int) -> float:
-        return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(self.current_prices[product_id]))
+    def conversion_rate(self, product_id: int, prices) -> float:
+        if self.environment.unknown_demand_curve:
+            return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
+        else:
+            # note we have to take the average conversion rate, so we weight the c_rate of each group
+            # save old value
+            save = self.environment.uncertain_demand_curve
+            self.environment.uncertain_demand_curve = False  # since we need expected value
+            rate = sum([self.environment.sample_demand_curve(group=g, prod_id=product_id, price=prices[product_id], n_day=self.n_day) *
+                     self.environment.group_proportions[g]
+                     for g in range(self.environment.n_groups)])
+            self.environment.uncertain_demand_curve = save  # ripristinarlo
+            return rate
 
-    def influence_function(self, i: int, j: int) -> float:
+    def influence_function(self, i: int, j: int, prices) -> float:
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
 
-        return self.influence_functor(i, j, self.conversion_rate, self.estimated_edge_probas)
+        def c_rate(prod_id):
+            return self.conversion_rate(prod_id, prices=prices)
+
+        if self.environment.unknown_product_weights:
+            return self.influence_functor(i, j, c_rate, self.estimated_edge_probas)
+
+        else:  # we do not use the estiamted edge probas
+            return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
     def greedy_algorithm(self) -> list[int]:
         """
@@ -260,17 +279,27 @@ class Simulator(object):
         return best_configuration
 
     # TODO(film): add group support and check this (coded too fast)
+
     def objective_function(self, prices: list[float]) -> float:
 
         current_margins = [
             self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)
         ]
         alpha_ratios = self.expected_alpha_r
-        conversion_rates = [
-            self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
-            for product_id in range(self.environment.n_products)
-        ]
 
+        if self.environment.unknown_demand_curve:  # use the estimates
+            conversion_rates = [
+                self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
+                for product_id in range(self.environment.n_products)
+            ]
+        else:
+            def c_rate(prod_id):
+                return self.conversion_rate(prod_id, prices=prices)
+
+            conversion_rates = [
+                c_rate(product_id)
+                for product_id in range(self.environment.n_products)
+            ]
         return sum(
             [
                 alpha_ratios[product_id + 1]
@@ -278,7 +307,7 @@ class Simulator(object):
                     conversion_rates[product_id] * current_margins[product_id]
                     + sum(
                         [
-                            self.influence_function(product_id, secondary_product_id)
+                            self.influence_function(product_id, secondary_product_id, prices)
                             * conversion_rates[secondary_product_id]
                             * current_margins[secondary_product_id]
                             for secondary_product_id in range(self.environment.n_products)

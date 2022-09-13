@@ -42,7 +42,7 @@ sample.demand = function(f,p, min.price, max.price){
   # to plot and visualise
   #matplot(grid,t(data), type="l", col=adjustcolor(col=1,alpha.f = .4))
   #lines(grid,m, col="blue", lwd=5)
-  i = which(grid == p)
+  i = which(grid == as.integer(p))
   return (data[i])
 }
 

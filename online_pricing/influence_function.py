@@ -11,7 +11,7 @@ class InfluenceFunctor:
         """
         :param i: starting product
         :param j: other product
-        :param c_rate: function that yields the conversion rate of product of p in P
+        :param c_rate: function that yields the conversion rate of product of i in P
         :param edge_probas: the edge probabilities (estimated in the case they are unknown)
         :return: sum of probabilities of different paths to click j given that i was bought
         """
