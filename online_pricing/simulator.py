@@ -6,7 +6,7 @@ import numpy as np
 
 from online_pricing.environment import EnvironmentBase
 from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.learner import Learner
+from online_pricing.learner import Learner, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
 
@@ -44,6 +44,9 @@ class Simulator(object):
             [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
             for i in range(self.environment.n_products)
         ]
+        self.quantity_learners = [TSLearner(1, [0])]
+        self.n_labeled_groups = 1
+
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
         self.reward_tracer = tracer
         self.n_day = 0
@@ -131,6 +134,7 @@ class Simulator(object):
         n_units = 0
         if random.random() <= buy_probability:
             n_units = self.environment.sample_quantity_bought(group)
+            self.quantity_learners[0].update(0, n_units)
 
         return n_units
 
@@ -239,6 +243,17 @@ class Simulator(object):
         else:  # we do not use the estiamted edge probas
             return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
+    def mean_quantity_bought(self, labeled_group_id=0):
+        if not self.environment.context_generation:
+            if self.environment.unknown_quantity_bought:
+                return self.quantity_learners[0].sample_arm(0)
+            else:
+                return sum([self.environment.distributions_parameters["quantity_demanded_params"][g]
+                            * self.environment.group_proportions[g]
+                            for g in range(self.environment.n_groups)])
+        else:
+            raise Exception("Need to develop context generation case")
+
     def greedy_algorithm(self) -> list[int]:
         """
         Greedy algorithm to select next day configuration of prices.
@@ -304,12 +319,13 @@ class Simulator(object):
             [
                 alpha_ratios[product_id + 1]
                 * (
-                    conversion_rates[product_id] * current_margins[product_id]
+                    conversion_rates[product_id] * current_margins[product_id] * self.mean_quantity_bought()
                     + sum(
                         [
                             self.influence_function(product_id, secondary_product_id, prices)
                             * conversion_rates[secondary_product_id]
                             * current_margins[secondary_product_id]
+                            * self.mean_quantity_bought()
                             for secondary_product_id in range(self.environment.n_products)
                             if secondary_product_id != product_id
                         ]
