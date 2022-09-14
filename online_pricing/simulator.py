@@ -12,7 +12,7 @@ from online_pricing.tracer import Tracer
 
 
 class Simulator(object):
-    def __init__(self, environment: EnvironmentBase, seed: int, tracer: Tracer):
+    def __init__(self, environment: EnvironmentBase, seed: int, tracer: Tracer, **learner_args):
         self.seed = seed  # TODO: use this
         self.groups = range(3)
         self.environment = environment
@@ -32,7 +32,7 @@ class Simulator(object):
         # lambda to go to second secondary products
         self._lambda = self.environment._lambda
         self.learners: list[Learner] = [
-            environment.learner_class(n_arms=self.environment.n_products, prices=self.prices[idx])
+            environment.learner_class(n_arms=self.environment.n_products, prices=self.prices[idx], **learner_args)
             for idx in range(self.environment.n_products)
         ]
         self.social_influence = SocialInfluence(
@@ -222,9 +222,15 @@ class Simulator(object):
             # save old value
             save = self.environment.uncertain_demand_curve
             self.environment.uncertain_demand_curve = False  # since we need expected value
-            rate = sum([self.environment.sample_demand_curve(group=g, prod_id=product_id, price=prices[product_id], n_day=self.n_day) *
-                     self.environment.group_proportions[g]
-                     for g in range(self.environment.n_groups)])
+            rate = sum(
+                [
+                    self.environment.sample_demand_curve(
+                        group=g, prod_id=product_id, price=prices[product_id], n_day=self.n_day
+                    )
+                    * self.environment.group_proportions[g]
+                    for g in range(self.environment.n_groups)
+                ]
+            )
             self.environment.uncertain_demand_curve = save  # ripristinarlo
             return rate
 
@@ -308,13 +314,11 @@ class Simulator(object):
                 for product_id in range(self.environment.n_products)
             ]
         else:
+
             def c_rate(prod_id):
                 return self.conversion_rate(prod_id, prices=prices)
 
-            conversion_rates = [
-                c_rate(product_id)
-                for product_id in range(self.environment.n_products)
-            ]
+            conversion_rates = [c_rate(product_id) for product_id in range(self.environment.n_products)]
         return sum(
             [
                 alpha_ratios[product_id + 1]

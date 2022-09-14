@@ -35,7 +35,7 @@ class Learner(ABC):
 
 
 class UCBLearner(Learner):
-    def __init__(self, n_arms: int, prices: list[float]):
+    def __init__(self, n_arms: int, prices: list[float], **kwargs):
         super().__init__(n_arms, prices)
         self.means = [0.0] * n_arms
         self.widths = [np.inf] * n_arms
@@ -63,7 +63,7 @@ class UCBLearner(Learner):
 
 
 class TSLearner(Learner):
-    def __init__(self, n_arms: int, prices: list[float]):
+    def __init__(self, n_arms: int, prices: list[float], **kwargs):
         super().__init__(n_arms, prices)
         self.beta_parameters = np.ones(shape=(n_arms, 2))
 
@@ -93,9 +93,9 @@ class TSLearner(Learner):
 
 
 class SWUCBLearner(UCBLearner):
-    def __init__(self, n_arms: int, prices: list[float], window_size: int):
+    def __init__(self, n_arms: int, prices: list[float], **kwargs):
         super().__init__(n_arms, prices)
-        self.window_size = window_size
+        self.window_size = kwargs.get("window_size")
 
     def update(self, arm_pulled: int, reward: int) -> None:
         self.t += 1
@@ -113,15 +113,17 @@ class SWUCBLearner(UCBLearner):
 
 
 # https://arxiv.org/pdf/1802.03692.pdf
-class MUCB(UCBLearner):
-    def __init__(self, n_arms: int, prices: list[float], w: int, beta: int, gamma: int) -> None:
+class MUCBLearner(UCBLearner):
+    def __init__(self, n_arms: int, prices: list[float], **kwargs) -> None:
         super().__init__(n_arms, prices)
-        assert w > 0 & beta > 0 & gamma >= 0 & gamma <= 1
-        self.w = w
-        self.beta = beta
-        self.gamma = gamma
+
+        self.w = kwargs.get("w")
+        self.beta = kwargs.get("beta")
+        self.gamma = kwargs.get("gamma")
         self.detections = [0]
         self.last_detection = 0
+
+        assert self.w > 0 & self.beta > 0 & self.gamma >= 0 & self.gamma <= 1
 
     def update(self, arm_pulled: int, reward: int) -> None:
         super(UCBLearner, self).update(arm_pulled, reward)
