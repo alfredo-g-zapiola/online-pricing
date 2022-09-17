@@ -1,3 +1,5 @@
+import warnings
+
 import click
 from tqdm import tqdm
 
@@ -5,6 +7,8 @@ from online_pricing.environment import EnvironmentBase
 from online_pricing.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
 from online_pricing.simulator import Simulator
 from online_pricing.tracer import Tracer
+
+warnings.filterwarnings("ignore")
 
 
 @click.command()
@@ -26,6 +30,11 @@ def main(
     n_sims: int,
     sliding_window: bool,
 ) -> None:
+    print()
+    print()
+    print(" !==============================! Simulation Starting !==============================! ")
+    print()
+    print()
 
     learner_args = {
         "window_size": 10,
@@ -167,6 +176,12 @@ def main(
             tracer.plot_day()
             tracer.plot_total()
 
+    print()
+    print()
+    print(" !==============================! End of Simulation !==============================! ")
+    print()
+    print()
+
 
 def run_simulator(
     n_samples: int, n_days: int, environment: EnvironmentBase, tracer: Tracer, learner_factory: LearnerFactory
@@ -174,7 +189,7 @@ def run_simulator(
     try:
         for n in range(n_samples):
             simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
-            for _ in tqdm(range(n_days), desc=f"Simulating iteration {n+1}"):
+            for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
                 simulator.sim_one_day()
             tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, sample=n)
 
@@ -182,7 +197,7 @@ def run_simulator(
                 tracer.new_day()
 
     except KeyboardInterrupt:
-        print(" !===============! Interrupted !===============! ")
+        print(" !==============================! Interrupted !==============================! ")
 
 
 if __name__ == "__main__":

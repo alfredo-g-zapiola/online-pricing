@@ -9,7 +9,8 @@ from rpy2.robjects.packages import importr
 
 from online_pricing.influence_function import InfluenceFunctor
 from online_pricing.learner import TSLearner
-from online_pricing.utils import suppress_output
+from online_pricing.user import User
+from online_pricing.utils import flatten, suppress_output
 from online_pricing.wishart import WishartHandler
 
 
@@ -188,7 +189,7 @@ class EnvironmentBase:
             clipper = robjects.r["clipper.f"]
             return _apply_shift(float(clipper(curve_f(price)[0])[0]))
 
-    def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
+    def get_direct_clients(self) -> list[User]:
         """
         Get all direct clients, for each group, with their respective primary product.
 
@@ -203,7 +204,6 @@ class EnvironmentBase:
              -> primary_product_id in {-1, 0, .., n_products-1}
         """
         n_user = self.sample_n_users()
-        cumsum_clients = [0, *np.cumsum(n_user)]
         if self.uncertain_alpha:
             dirichlet_sample = [
                 np.random.dirichlet(self.distributions_parameters["dirichlet_params"][g]) for g in range(self.n_groups)
@@ -218,26 +218,22 @@ class EnvironmentBase:
 
         # take out clients going away (i.e. alpha_0)
         n_direct_clients = [int(n_user[g] * (1 - dirichlet_sample[g][0])) for g in range(self.n_groups)]
-
-        direct_clients = {
-            f"group_{idx}": list(
-                zip(
-                    np.random.choice(
-                        range(cumsum_clients[idx], cumsum_clients[idx + 1]),
-                        size=n_direct_clients[idx],
-                        replace=False,
-                    ),
-                    np.random.choice(
-                        list(range(self.n_products)),
-                        n_direct_clients[idx],
-                        # take out element 0, re-normalise
-                        p=dirichlet_sample[idx][1:] / dirichlet_sample[idx][1:].sum(),
+        products = list(range(self.n_products))
+        direct_clients = [
+            [
+                User(
+                    group=group,
+                    landing_product=np.random.choice(
+                        products,
+                        p=dirichlet_sample[group][1:] / dirichlet_sample[group][1:].sum(),
                     ),
                 )
-            )
-            for idx, n_group in enumerate(n_user)
-        }
-        return direct_clients
+                for idx in range(n_direct_clients[group])
+            ]
+            for group in range(self.n_groups)
+        ]
+
+        return flatten(direct_clients)
 
     def sample_quantity_bought(self, group: int) -> int:
         """

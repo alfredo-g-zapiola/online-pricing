@@ -9,6 +9,7 @@ from online_pricing.influence_function import InfluenceFunctor
 from online_pricing.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
+from online_pricing.user import User
 
 
 class Simulator(object):
@@ -78,22 +79,17 @@ class Simulator(object):
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int] = [0] * self.environment.n_products
         n_users = 0
-        for group in self.groups:
-            for client_id, primary_product in direct_clients[f"group_{group}"]:
-                if primary_product == -1:
-                    continue  # Client didn't visit the website
+        for client in direct_clients:
+            n_users += 1
+            buys, influenced_episodes = self.sim_one_user(
+                client=client,
+                product_graph=self.environment.distributions_parameters["product_graph"][client.group].sample(),
+                prices=self.current_prices,
+            )
+            products_sold = sum_by_element(products_sold, buys)
 
-                n_users += 1
-                buys, influenced_episodes = self.sim_one_user(
-                    group=group,
-                    landing_product=primary_product,
-                    product_graph=self.environment.distributions_parameters["product_graph"][group].sample(),
-                    prices=self.current_prices,
-                )
-                products_sold = sum_by_element(products_sold, buys)
-
-                self.update_learners(buys=buys, prices=self.current_prices)
-                self.social_influence.add_episode(influenced_episodes)
+            self.update_learners(buys=buys, prices=self.current_prices)
+            self.social_influence.add_episode(influenced_episodes)
         # Estimate probabilities
         # Regret calculator
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
@@ -149,9 +145,7 @@ class Simulator(object):
 
         return n_units
 
-    def sim_one_user(
-        self, group: int, landing_product: int, product_graph: Any, prices: list[float]
-    ) -> tuple[list[int], list[list[int]]]:
+    def sim_one_user(self, client: User, product_graph: Any, prices: list[float]) -> tuple[list[int], list[list[int]]]:
         """
         Function to simulate the behavior of a single user.
 
@@ -161,8 +155,7 @@ class Simulator(object):
         to "click on it". If the user clicks on a secondary product, he will then choose to buy it if the price is
         interesting. When no more products are available, the iteration will end.
 
-        :param group: group of the user
-        :param landing_product: landing product id
+        :param client: user
         :param product_graph: secondary product probability graph
         :param prices: prices of the products
         :return: list of number of units bought per product and the influencing matrix
@@ -177,7 +170,7 @@ class Simulator(object):
 
         # Initialize the queue with the landing product, it has a probability of 1 to be seen
         visiting_que: Deque[VisitingNode] = deque()
-        visiting_que.append(VisitingNode(product_id=landing_product, probability=1))
+        visiting_que.append(VisitingNode(product_id=client.landing_product, probability=1))
         while visiting_que:
             current_node = visiting_que.pop()
             product_id = current_node.product_id
@@ -185,7 +178,7 @@ class Simulator(object):
             if random.random() <= current_node.probability and not visited[product_id]:
                 visited[product_id] = 1
                 # Simulate the buy of the product and update records
-                buys[product_id] = self.sim_buy(group, product_id, prices[product_id])
+                buys[product_id] = self.sim_buy(client.group, product_id, prices[product_id])
                 influence_episodes.append(visited.copy())
 
                 # If the user bought something, we unlock the secondary products
@@ -204,8 +197,10 @@ class Simulator(object):
         # We need to return the history of jumpes between pages, but just the information about
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
         history = influence_episodes[:3]
-        prepare_episode = [history[0] if buys[landing_product] else [0] * self.environment.n_products]
-        prepare_episode.append(sum_by_element(history[-1], history[0], difference=True) if buys[landing_product] else None)
+        prepare_episode = [history[0] if buys[client.landing_product] else [0] * self.environment.n_products]
+        prepare_episode.append(
+            sum_by_element(history[-1], history[0], difference=True) if buys[client.landing_product] else None
+        )
 
         # Return history records
         return buys, [episode for episode in prepare_episode if episode is not None]
@@ -226,7 +221,7 @@ class Simulator(object):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
     def conversion_rate(self, product_id: int, prices) -> float:
-        if self.environment.unknown_demand_curve:
+        if not self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
         else:
             # note we have to take the average conversion rate, so we weight the c_rate of each group

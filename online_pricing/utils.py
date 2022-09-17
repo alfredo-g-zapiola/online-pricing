@@ -8,7 +8,7 @@ from typing import Any
 def suppress_output(func: Any) -> Any:
     @wraps(func)
     def inner(*args: Any, **kwds: Any) -> None:
-        print("Running function: ", func.__name__)
+        print(f"Running function: {func.__name__} \n")
         # Disable logging
         logging.disable(logging.CRITICAL)
         # Disable stdout
@@ -23,3 +23,7 @@ def suppress_output(func: Any) -> Any:
         logging.disable(logging.NOTSET)
 
     return inner
+
+
+def flatten(my_list: list[list[Any]]) -> list[Any]:
+    return [item for sublist in my_list for item in sublist]

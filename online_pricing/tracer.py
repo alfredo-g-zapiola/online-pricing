@@ -88,7 +88,6 @@ class Tracer:
             ax.set_title(f"Product {idx }")
             ax.set_xlabel("Days")
             ax.set_ylabel("Conversion Rate")
-            ax.legend()
 
         for ax in fig.get_axes():
             ax.tick_params(bottom=False, labelbottom=False)
