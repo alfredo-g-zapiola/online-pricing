@@ -2,6 +2,7 @@ import itertools
 from typing import Any, cast
 
 import numpy as np
+import numpy.typing as npt
 
 # from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
@@ -255,7 +256,7 @@ class EnvironmentBase:
         :return: A list of n_products where for each product we have the two secondaries
         """
         # first we have a weighed mean of the means of the product graphs
-        weighted_mean_p_graph = np.zeros((self.n_products, self.n_products), dtype=float)
+        weighted_mean_p_graph: npt.NDArray[np.float32] = np.zeros((self.n_products, self.n_products), dtype=np.float32)
         for g in range(self.n_groups):
             weighted_mean_p_graph += (
                 self.distributions_parameters["product_graph"][g].mean * self.distributions_parameters["n_people_params"][g]
