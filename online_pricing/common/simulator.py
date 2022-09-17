@@ -217,7 +217,7 @@ class Simulator(object):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
     def conversion_rate(self, product_id: int, prices: list[float]) -> float:
-        if not self.environment.unknown_demand_curve:
+        if self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
         else:
             # note we have to take the average conversion rate, so we weight the c_rate of each group
