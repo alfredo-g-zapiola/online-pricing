@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any, Type
 
 import numpy as np
 
@@ -35,7 +36,7 @@ class Learner(ABC):
 
 
 class UCBLearner(Learner):
-    def __init__(self, n_arms: int, prices: list[float], **kwargs):
+    def __init__(self, n_arms: int, prices: list[float]):
         super().__init__(n_arms, prices)
         self.means = [0.0] * n_arms
         self.widths = [np.inf] * n_arms
@@ -63,7 +64,7 @@ class UCBLearner(Learner):
 
 
 class TSLearner(Learner):
-    def __init__(self, n_arms: int, prices: list[float], **kwargs):
+    def __init__(self, n_arms: int, prices: list[float]):
         super().__init__(n_arms, prices)
         self.beta_parameters = np.ones(shape=(n_arms, 2))
 
@@ -93,9 +94,9 @@ class TSLearner(Learner):
 
 
 class SWUCBLearner(UCBLearner):
-    def __init__(self, n_arms: int, prices: list[float], **kwargs):
+    def __init__(self, n_arms: int, prices: list[float], window_size: int):
         super().__init__(n_arms, prices)
-        self.window_size = kwargs.get("window_size")
+        self.window_size = window_size
 
     def update(self, arm_pulled: int, reward: int) -> None:
         self.t += 1
@@ -114,16 +115,16 @@ class SWUCBLearner(UCBLearner):
 
 # https://arxiv.org/pdf/1802.03692.pdf
 class MUCBLearner(UCBLearner):
-    def __init__(self, n_arms: int, prices: list[float], **kwargs) -> None:
+    def __init__(self, n_arms: int, prices: list[float], w: float, beta: float, gamma: float) -> None:
         super().__init__(n_arms, prices)
 
-        self.w = kwargs.get("w")
-        self.beta = kwargs.get("beta")
-        self.gamma = kwargs.get("gamma")
+        self.w = w
+        self.beta = beta
+        self.gamma = gamma
         self.detections = [0]
         self.last_detection = 0
 
-        assert self.w > 0 & self.beta > 0 & self.gamma >= 0 & self.gamma <= 1
+        assert self.w > 0 and self.beta > 0 and 0 <= self.gamma <= 1
 
     def update(self, arm_pulled: int, reward: int) -> None:
         super(UCBLearner, self).update(arm_pulled, reward)
@@ -153,3 +154,61 @@ class MUCBLearner(UCBLearner):
     def act(self) -> int:
         idx = np.argmax((self.means + self.widths))
         return int(idx)
+
+
+LEARNERS: dict[str, Type[Learner]] = {
+    "UCB": UCBLearner,
+    "TS": TSLearner,
+    "SWUCB": SWUCBLearner,
+    "MUCB": MUCBLearner,
+}
+
+
+class LearnerFactory:
+    def __init__(
+        self,
+        learner_class: str,
+        window_size: int | None = None,
+        w: float | None = None,
+        beta: float | None = None,
+        gamma: float | None = None,
+    ) -> None:
+        self._args: tuple[Any, ...] | None = None
+        self.learner = LEARNERS[learner_class]
+        self._specific_args: tuple[float | int, ...]
+
+        match learner_class:
+            case "TS":
+                self._specific_args = tuple()
+            case "UCB":
+                self._specific_args = tuple()
+            case "SWUCB":
+                if window_size is None:
+                    raise ValueError("window_size must be provided for SWUCB")
+                self._specific_args = (window_size,)
+            case "MUCB":
+                if w is None or beta is None or gamma is None:
+                    raise ValueError("w, beta and gamma must be provided for MUCB")
+                self._specific_args = (w, beta, gamma)
+            case _:
+                raise ValueError("Unknown learner class")
+
+    @property
+    def args(self) -> tuple[Any, ...]:
+        return self.base_args + self._specific_args
+
+    @property
+    def base_args(self) -> tuple[Any, ...]:
+        if self._args is None:
+            raise ValueError("args must be set before calling get_learner")
+        return self._args
+
+    @base_args.setter
+    def base_args(self, value: tuple[Any, ...]) -> None:
+        self._args = value
+
+    def get_learner(self) -> Learner:
+        try:
+            return self.learner(*self.args)
+        except TypeError as e:
+            raise TypeError(f"Invalid arguments for {self.learner.__name__}: {self.args}") from e

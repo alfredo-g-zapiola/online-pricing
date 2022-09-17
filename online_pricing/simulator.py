@@ -1,24 +1,36 @@
 import random
 from collections import deque, namedtuple
-from typing import Any, Deque, Type, TypeVar
+from typing import Any, Deque, TypeVar
 
 import numpy as np
 
 from online_pricing.environment import EnvironmentBase
 from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.learner import Learner, TSLearner
+from online_pricing.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.social_influence import SocialInfluence
 from online_pricing.tracer import Tracer
 
 
 class Simulator(object):
-    def __init__(self, environment: EnvironmentBase, seed: int, tracer: Tracer, **learner_args):
+    def __init__(self, environment: EnvironmentBase, seed: int, tracer: Tracer, learner_factory: LearnerFactory):
+        """
+        Initialize the simulator.
+
+        :param environment: environment of the simulator
+        :param seed: seed of the simulator
+        :param tracer: tracer of the simulator
+        :param learner_factory: factory of the learners
+        """
+        # Base parameters #
         self.seed = seed  # TODO: use this
         self.groups = range(3)
         self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
-        print("Secondaires are:\n", self.secondaries)
         self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
+        # lambda to go to second secondary products
+        self._lambda = self.environment.get_lambda()
+
+        # Price Parameters #
         self.prices = [
             [price_and_margin[0] for price_and_margin in prices_and_margins]
             for prices_and_margins in self.environment.prices_and_margins.values()
@@ -29,12 +41,13 @@ class Simulator(object):
         ]
         # start with the lowest prices
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
-        # lambda to go to second secondary products
-        self._lambda = self.environment._lambda
-        self.learners: list[Learner] = [
-            environment.learner_class(n_arms=self.environment.n_products, prices=self.prices[idx], **learner_args)
-            for idx in range(self.environment.n_products)
-        ]
+
+        # Learners #
+        self.learners = list[Learner]()
+        for idx in range(self.environment.n_products):
+            learner_factory.base_args = (self.environment.n_products, self.prices[idx])
+            self.learners.append(learner_factory.get_learner())
+
         self.social_influence = SocialInfluence(
             self.environment.n_products, secondaries=self.secondaries, lambda_param=self._lambda
         )
@@ -65,7 +78,6 @@ class Simulator(object):
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int] = [0] * self.environment.n_products
         n_users = 0
-        print("Simulating clients")
         for group in self.groups:
             for client_id, primary_product in direct_clients[f"group_{group}"]:
                 if primary_product == -1:
@@ -84,7 +96,6 @@ class Simulator(object):
                 self.social_influence.add_episode(influenced_episodes)
         # Estimate probabilities
         # Regret calculator
-        print("Estimating edge probas")
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         current_margins = [
@@ -96,23 +107,23 @@ class Simulator(object):
 
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
-        print("Calling greedy algorithm")
+
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
 
-        print("\n =========== DAY OVER ===========")
-        print("Products sold:", products_sold)
-        print("Current prices:", self.current_prices)
-        print("Current margins:", current_margins)
-        print("Mean reward per client:", mean_reward_per_client)
-        print("Next configuration:", next_day_configuration)
-        print("Estimated edge probabilities:")
-        print_matrix(self.estimated_edge_probas)
-        print("Product Graph:")
-        print_matrix(self.environment.mean_product_graph)
-        print("Secondaries:")
-        print_matrix(self.secondaries, indexes=True)
-        print("\n")
+        # print("\n =========== DAY OVER ===========")
+        # print("Products sold:", products_sold)
+        # print("Current prices:", self.current_prices)
+        # print("Current margins:", current_margins)
+        # print("Mean reward per client:", mean_reward_per_client)
+        # print("Next configuration:", next_day_configuration)
+        # print("Estimated edge probabilities:")
+        # print_matrix(self.estimated_edge_probas)
+        # print("Product Graph:")
+        # print_matrix(self.environment.mean_product_graph)
+        # print("Secondaries:")
+        # print_matrix(self.secondaries, indexes=True)
+        # print("\n")
         self.n_day += 1
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
@@ -254,9 +265,13 @@ class Simulator(object):
             if self.environment.unknown_quantity_bought:
                 return self.quantity_learners[0].sample_arm(0)
             else:
-                return sum([self.environment.distributions_parameters["quantity_demanded_params"][g]
-                            * self.environment.group_proportions[g]
-                            for g in range(self.environment.n_groups)])
+                return sum(
+                    [
+                        self.environment.distributions_parameters["quantity_demanded_params"][g]
+                        * self.environment.group_proportions[g]
+                        for g in range(self.environment.n_groups)
+                    ]
+                )
         else:
             raise Exception("Need to develop context generation case")
 

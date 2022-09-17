@@ -1,8 +1,7 @@
 import itertools
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import numpy as np
-import numpy.typing as npt
 
 # from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
@@ -10,6 +9,7 @@ from rpy2.robjects.packages import importr
 
 from online_pricing.influence_function import InfluenceFunctor
 from online_pricing.learner import TSLearner
+from online_pricing.utils import suppress_output
 from online_pricing.wishart import WishartHandler
 
 
@@ -28,7 +28,7 @@ class EnvironmentBase:
         self.context_generation = hyperparameters.get("context_generation", False)
         self.uncertain_alpha = hyperparameters.get("uncertain_alpha", False)
         self.group_unknown = hyperparameters.get("group_unknown", True)
-        self._lambda = hyperparameters.get("lambda", 0.5)
+        self._lambda: float = hyperparameters.get("lambda", 0.5)
         self.uncertain_demand_curve = hyperparameters.get("uncertain_demand_curve", False)
         self.uncertain_quantity_bought = hyperparameters.get("uncertain_quantity_bought", False)
         self.uncertain_graph_weights = hyperparameters.get("uncertain_graph_weights", False)
@@ -39,13 +39,11 @@ class EnvironmentBase:
         self.unknown_demand_curve = hyperparameters.get("unknown_demand_curve", True)
         self.unknown_quantity_bought = hyperparameters.get("unknown_quantity_bought", True)
         self.unknown_product_weights = hyperparameters.get("unknown_product_weights", True)
-        print(hyperparameters)
-        """
-        Prices and margins: taken from the demand_curves.R we have the prices.
-        We assume the cost to be the 40% of the standard price, so that when there is 40% discount,
-        we break even (it would hardly make sense otherwise)
-        Note the margin decreases linearly with the price
-        """
+
+        # Prices and margins: taken from the demand_curves.R we have the prices.
+        # We assume the cost to be the 40% of the standard price, so that when there is 40% discount,
+        # we break even (it would hardly make sense otherwise)
+        # Note the margin decreases linearly with the price
         self.prices_and_margins: dict[str, list[tuple[float, float]]] = {
             "echo_dot": [(13, 0), (27, 14), (32, 19), (34, 21)],
             "ring_chime": [
@@ -86,21 +84,31 @@ class EnvironmentBase:
             # end of product_graph matrices list
             # N.B. client graph probabilities are included in the Social Influece class
         }
-        self.mean_product_graph = None
+        self.mean_product_graph = list[float]()
         self.influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
 
         # initialise R session
         self._init_r()
         self.group_proportions = list(range(self.n_groups))
         for g in range(self.n_groups):
-            self.group_proportions[g] = self.distributions_parameters["n_people_params"][g] / \
-                                        sum(self.distributions_parameters["n_people_params"])
+            self.group_proportions[g] = self.distributions_parameters["n_people_params"][g] / sum(
+                self.distributions_parameters["n_people_params"]
+            )
 
         # value the objective function
-        self.rewards = dict()
-        self.clairvoyant = {}
+        self.rewards = dict[str, float]()
+        self.clairvoyant = dict[str, float]()
+
+    def get_lambda(self) -> float:
+        """
+        Get the lambda parameter.
+
+        :return: lambda parameter
+        """
+        return self._lambda
 
     @staticmethod
+    @suppress_output
     def _init_r() -> None:
         """
         start R and download the roahd package, define the functions of the demand curves
@@ -125,17 +133,16 @@ class EnvironmentBase:
         )
         return n_users
 
-    # TODO: use this
-    # def sample_affinity(self, prod_id, group, first=True):
-    #     return np.random.uniform(0, 1)
-
     def sample_demand_curve(self, group: int, prod_id: int, price: float, n_day: int = 0) -> float:
         """
+        Samples the demand curve for a given group, product and price. The day is used when the demand curve is shifting
+
 
         :param group: the id of the group
         :param prod_id: the id of the product
         :param price: the price at which we want to sample
-        :return: a price the client is willing to pay
+        :param n_day: the day of the simulation
+        :return: the probability of buying the product at the given price
         """
 
         # python 3.10 for match
@@ -163,29 +170,23 @@ class EnvironmentBase:
             case _:
                 raise ValueError("Invalid group id")
 
-        def apply_shift(c_rate):
+        def _apply_shift(c_rate: float) -> float:
             if not self.shifting_demand_curve:
                 return c_rate
             else:
-                if n_day > 15 and n_day <= 30:
+                if 15 < n_day <= 30:
                     c_rate = np.clip(c_rate * 1.5, 0, 1)
                 elif n_day > 30:
                     c_rate = np.clip(c_rate * 0.5, 0, 1)
                 return c_rate
 
         if self.uncertain_demand_curve:
-            robjects.r(
-                """
-                d <- sample.demand({}, {}, 0, 200 )
-            """.format(
-                    f_name, price
-                )
-            )
-            return apply_shift((robjects.r("d")[0]))
+            robjects.r("d <- sample.demand({}, {}, 0, 200 )".format(f_name, price))
+            return _apply_shift((robjects.r("d")[0]))
         else:
             curve_f = robjects.r["{}".format(f_name)]
             clipper = robjects.r["clipper.f"]
-            return apply_shift(float(clipper(curve_f(price)[0])[0]))
+            return _apply_shift(float(clipper(curve_f(price)[0])[0]))
 
     def get_direct_clients(self) -> dict[str, list[tuple[int, int]]]:
         """
@@ -251,22 +252,25 @@ class EnvironmentBase:
 
         return m
 
-    def yield_first_secondaries(self) -> list[npt.NDArray[int]]:
+    def yield_first_secondaries(self) -> list[list[int]]:
         """
         Sends to the simulator the two best products to be the secondaries.
 
         :return: A list of n_products where for each product we have the two secondaries
         """
         # first we have a weighed mean of the means of the product graphs
-        weighted_mean_p_graph = np.zeros((self.n_products, self.n_products))
+        weighted_mean_p_graph = np.zeros((self.n_products, self.n_products), dtype=float)
         for g in range(self.n_groups):
             weighted_mean_p_graph += (
                 self.distributions_parameters["product_graph"][g].mean * self.distributions_parameters["n_people_params"][g]
             )
 
         weighted_mean_p_graph /= sum([self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)])
-        self.mean_product_graph = weighted_mean_p_graph
-        return [np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False) for i in range(self.n_products)]
+        self.mean_product_graph = weighted_mean_p_graph.tolist()
+        return [
+            np.flip(np.argsort(weighted_mean_p_graph[i]))[:2].astype(int, copy=False).tolist()
+            for i in range(self.n_products)
+        ]
 
     def yield_expected_alpha(self) -> list[float] | list[list[float]]:
         """
@@ -294,7 +298,9 @@ class EnvironmentBase:
 
         return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
-    def product_matrix(self, size: int, fully_connected: bool = True, unif_params=(0.1, 1)) -> WishartHandler:
+    def product_matrix(
+        self, size: int, fully_connected: bool = True, unif_params: tuple[float, float] = (0.1, 1.0)
+    ) -> WishartHandler:
         """
         Generate random product matrix.
         Note the higher the group number, the richer the population, and hence higher the edges.
@@ -309,8 +315,7 @@ class EnvironmentBase:
 
         :param size: size of the matrix, i.e. (n_products, n_products)
         :param fully_connected: if True, the matrix is fully connected, i.e. all products are connected to all other products
-        :param group: bigger the group id, the richer the population, the higher in mean the product graph
-        :param unif_params
+        :param unif_params: the parameters of the uniform distribution used to generate the wishart distribution
         :return: a random product matrix
         """
 
@@ -323,36 +328,39 @@ class EnvironmentBase:
             seed=2200337,
         )
 
-    def compute_clairvoyant(self):
+    def compute_clairvoyant(self) -> tuple[dict[str, float], str]:
         """
         For every price combination (so it is a carthesian product of the possible prices with itself)
         , obtain the expected mean margin.
         I.e. we compute a grid search working with expected values
-        Note it was tested:
-            if the margins are all 1, and there is 1 user per group then (0,0,0,0,0) is the best one (we maximise influence function),
-            and moreover its clairvoyant is below 1 (probability measure)
-        :return:
+        Note:
+        it was tested, if the margins are all 1, and there is 1 user per group then (0,0,0,0,0) is the best one
+        (we maximise influence function), and moreover its clairvoyant is below 1 (probability measure)
+
+        :return: the best price combination and its clairvoyant
         """
-        push_uncertain = self.uncertain_demand_curve  # save config
-        self.uncertain_demand_curve = False  # so we take the mean value
-        push_alpha_context = self.context_generation
-        self.context_generation = True
-        expected_alpha_r = cast(list[list[float]], self.yield_expected_alpha())
+
+        def price_and_margin(product: int) -> tuple[float, float]:
+            return self.prices_and_margins[self.product_id_map[product]][price_config[product]]
+
+        def c_rate(product: int) -> float:
+            """Compute the conversion rate fixed with fixed group and prices.
+            This is why the function is redefined daily"""
+            return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0])
 
         rewards = {}
         maximum = 0.0
+        cur_reward = 0.0
         max_arm = ""
+
+        uncertain_config = self.uncertain_demand_curve  # save config
+        self.uncertain_demand_curve = False  # so we take the mean value
+        alpha_context_config = self.context_generation
+        self.context_generation = True
+        expected_alpha_r = cast(list[list[float]], self.yield_expected_alpha())
 
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
-            print("Current price config: ", str(price_config))
-            cur_reward = 0.0
-            price_and_margin = lambda p: self.prices_and_margins[self.product_id_map[p]][price_config[p]]
-
-            def c_rate(product: int) -> float:
-                """Compute the conversion rate fixed with fixed group and prices.
-                This is why the function is redefined daily"""
-                return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0])
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
@@ -398,15 +406,15 @@ class EnvironmentBase:
                 max_arm = str(price_config)
 
         # reset data members
-        self.uncertain_demand_curve = push_uncertain
-        self.context_generation = push_alpha_context
+        self.uncertain_demand_curve = uncertain_config
+        self.context_generation = alpha_context_config
 
         self.rewards = rewards
         self.clairvoyant = {max_arm: maximum}
 
         return rewards, max_arm
 
-    def yield_clairvoyant(self):
+    def yield_clairvoyant(self) -> float | tuple[float | None, ...]:
         """
         Clairvoyant is hard-coded since it takes 30 mins to compute it
         :return:
@@ -414,4 +422,4 @@ class EnvironmentBase:
         if not self.shifting_demand_curve:
             return 19.08163728705  # with arm (1,1,3,1,1)
         else:
-            return (19.08163728705, None, None)
+            return 19.08163728705, None, None
