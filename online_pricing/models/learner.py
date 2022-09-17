@@ -34,6 +34,9 @@ class Learner(ABC):
     def sample_arm(self, arm_id: int) -> float:
         pass
 
+    def mean_arm(self, arm_id: int) -> float:
+        pass
+
 
 class UCBLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):

@@ -16,6 +16,6 @@ class User(BaseModel):
 
     @root_validator()
     def set_features(cls, values: dict[str, Any]) -> dict[str, Any]:
-        features = [int(feature) for feature in "{0:02b}".format(values["group"])]
-        values.update({"feature_0": features[0], "feature_1": features[1]})
+        features = [int(feature) for feature in f"{values['group']:02b}"]
+        values.update({"feature_0": features[1], "feature_1": features[0]})
         return values

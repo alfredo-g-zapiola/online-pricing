@@ -3,10 +3,10 @@ import warnings
 import click
 from tqdm import tqdm
 
-from online_pricing.environment import EnvironmentBase
-from online_pricing.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
-from online_pricing.simulator import Simulator
-from online_pricing.tracer import Tracer
+from online_pricing.common.environment import EnvironmentBase
+from online_pricing.common.simulator import Simulator
+from online_pricing.helpers.tracer import Tracer
+from online_pricing.models.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
 
 warnings.filterwarnings("ignore")
 
@@ -50,7 +50,7 @@ def main(
 
     match step:
         case 3:
-            environments = (
+            environments: list[EnvironmentBase] = [
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -68,10 +68,10 @@ def main(
                         "unknown_product_weights": False,
                     },
                 ),
-            )
+            ]
 
         case 4:
-            environments = (
+            environments = [
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -89,9 +89,9 @@ def main(
                         "unknown_product_weights": False,
                     },
                 ),
-            )
+            ]
         case 5:
-            environments = (
+            environments = [
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -109,7 +109,7 @@ def main(
                         "unknown_product_weights": True,
                     },
                 ),
-            )
+            ]
         case 6:
             base_parameters = {
                 "fully_connected": fully_connected,
@@ -127,7 +127,7 @@ def main(
                 "Ucb_sliding_window": sliding_window,
             }
 
-            environments = (
+            environments = [
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -143,9 +143,9 @@ def main(
                     n_groups=3,
                     hyperparameters=base_parameters | {"learner_class": MUCBLearner},
                 ),
-            )
+            ]
         case 7:
-            environments = (
+            environments = [
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -164,7 +164,7 @@ def main(
                         "shifting_demand_curve": True,
                     },
                 ),
-            )
+            ]
 
         case _:
             raise ValueError(f"Step {step} does not exists.")

@@ -5,7 +5,7 @@ from matplotlib.gridspec import GridSpec
 from scipy import interpolate
 
 
-def moving_average(avg_rewards) -> list[float]:
+def moving_average(avg_rewards: list[float] | npt.NDArray[np.float32]) -> list[float]:
     window = 7
     average = []
     for idx in range(len(avg_rewards) - window + 1):
@@ -105,18 +105,18 @@ class Tracer:
         sdev_regret = cum_regret.std(axis=0)
         self.plot(mean_regrets, sdev_regret, "Mean cumulative regret")
 
-    def plot(self, what: npt.NDArray[float], sdev: float, title: str) -> None:
-        ma = moving_average(what)
+    def plot(self, data: npt.NDArray[np.float32] | list[float], sdev: float, title: str) -> None:
+        ma = moving_average(data)
 
         plt.figure()
         plt.plot(
-            what,
+            data,
             label="Mean {}".format(title),
             color="blue",
             linewidth=0.75,
         )
-        plt.plot(what + 3 * sdev, label="Upper bound {}".format(title), color="pink", linewidth=0.75)
-        plt.plot(what - 3 * sdev, label="Lower bound {}".format(title), color="pink", linewidth=0.75)
+        plt.plot(data + np.multiply(3, sdev), label="Upper bound {}".format(title), color="pink", linewidth=0.75)
+        plt.plot(data - np.multiply(3, sdev), label="Lower bound {}".format(title), color="pink", linewidth=0.75)
         plt.plot(
             ma,
             label="Moving Average",

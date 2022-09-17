@@ -1,15 +1,13 @@
 import random
 from collections import deque, namedtuple
-from typing import Any, Deque, TypeVar
+from typing import Any, Deque, TypeVar, cast
 
-import numpy as np
-
-from online_pricing.environment import EnvironmentBase
-from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.learner import Learner, LearnerFactory, TSLearner
-from online_pricing.social_influence import SocialInfluence
-from online_pricing.tracer import Tracer
-from online_pricing.user import User
+from online_pricing.common.environment import EnvironmentBase
+from online_pricing.common.influence_function import InfluenceFunctor
+from online_pricing.common.social_influence import SocialInfluence
+from online_pricing.helpers.tracer import Tracer
+from online_pricing.models.learner import Learner, LearnerFactory, TSLearner
+from online_pricing.models.user import User
 
 
 class Simulator(object):
@@ -54,10 +52,7 @@ class Simulator(object):
         )
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required
-        self.estimated_edge_probas = [
-            [np.random.uniform(size=5) * [1] if j in self.secondaries[i] else 0 for j in range(5)]
-            for i in range(self.environment.n_products)
-        ]
+        self.estimated_edge_probas: list[list[float]]
         self.quantity_learners = [TSLearner(1, [0])]
         self.n_labeled_groups = 1
 
@@ -197,13 +192,14 @@ class Simulator(object):
         # We need to return the history of jumpes between pages, but just the information about
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
         history = influence_episodes[:3]
-        prepare_episode = [history[0] if buys[client.landing_product] else [0] * self.environment.n_products]
+        prepare_episode = [history[0] if buys[client.landing_product] else [0 for _ in range(self.environment.n_products)]]
+
         prepare_episode.append(
-            sum_by_element(history[-1], history[0], difference=True) if buys[client.landing_product] else None
+            sum_by_element(history[-1], history[0], difference=True) if buys[client.landing_product] else [-1]
         )
 
         # Return history records
-        return buys, [episode for episode in prepare_episode if episode is not None]
+        return buys, [episode for episode in prepare_episode if episode is not [-1]]
 
     def update_learners(self, buys: list[int], prices: list[float]) -> None:
         """
@@ -220,7 +216,7 @@ class Simulator(object):
         for idx, bought in enumerate(did_buy):
             self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
 
-    def conversion_rate(self, product_id: int, prices) -> float:
+    def conversion_rate(self, product_id: int, prices: list[float]) -> float:
         if not self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
         else:
@@ -240,13 +236,13 @@ class Simulator(object):
             self.environment.uncertain_demand_curve = save  # ripristinarlo
             return rate
 
-    def influence_function(self, i: int, j: int, prices) -> float:
+    def influence_function(self, i: int, j: int, prices: list[float]) -> float:
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
 
-        def c_rate(prod_id):
+        def c_rate(prod_id: int) -> float:
             return self.conversion_rate(prod_id, prices=prices)
 
         if self.environment.unknown_product_weights:
@@ -255,7 +251,7 @@ class Simulator(object):
         else:  # we do not use the estiamted edge probas
             return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
-    def mean_quantity_bought(self, labeled_group_id=0):
+    def mean_quantity_bought(self) -> float:
         if not self.environment.context_generation:
             if self.environment.unknown_quantity_bought:
                 return self.quantity_learners[0].sample_arm(0)
@@ -316,7 +312,7 @@ class Simulator(object):
         current_margins = [
             self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)
         ]
-        alpha_ratios = self.expected_alpha_r
+        alpha_ratios = cast(list[float], self.expected_alpha_r)
 
         if self.environment.unknown_demand_curve:  # use the estimates
             conversion_rates = [
@@ -325,7 +321,7 @@ class Simulator(object):
             ]
         else:
 
-            def c_rate(prod_id):
+            def c_rate(prod_id: int) -> float:
                 return self.conversion_rate(prod_id, prices=prices)
 
             conversion_rates = [c_rate(product_id) for product_id in range(self.environment.n_products)]

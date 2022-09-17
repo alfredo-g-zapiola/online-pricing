@@ -3,7 +3,7 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
-from online_pricing.learner import Learner, TSLearner
+from online_pricing.models.learner import Learner, TSLearner
 
 
 class SocialInfluence:
@@ -11,7 +11,7 @@ class SocialInfluence:
         self.lambda_param = lambda_param
         self.n_episodes = n_episodes
         self.n_products = n_products
-        self.dataset: list[npt.NDArray[int]] = list()
+        self.dataset: list[npt.NDArray[np.int32]] = list()
         self.secondaries = secondaries
         # number of edges (we have one learner for each one)
         self.learners: list[tuple[Learner, Learner]] = [(TSLearner(1, [0]), TSLearner(1, [0])) for i in range(n_products)]
@@ -23,7 +23,7 @@ class SocialInfluence:
         """
         self.dataset.append(np.array(episode))
 
-    def estimate_probabilities(self) -> list[list[int | float]]:
+    def estimate_probabilities(self) -> list[list[float]]:
         """
         Look into all episodes of the day, and updates the beta distribution of each learner
         :return: the estimated probabilities of the edges
@@ -89,22 +89,3 @@ class SocialInfluence:
         estimated_prob = credit / occurr_v_active
         estimated_prob = np.nan_to_num(estimated_prob)
         return cast(list[float], estimated_prob.tolist())
-
-    #
-    # def __test(self):
-    #     n_products = 5
-    #     n_episodes = 1000
-    #     prob_matrix = np.random.uniform(
-    #         0.0, 0.1, (n_products, n_products)
-    #     )  # initial matrix provided by flavio (?)
-    #     node_index = 4
-    #     dataset = []
-    #
-    #     for e in range(0, n_episodes):
-    #         dataset.append(self.simulate_episode(init_prob_matrix=prob_matrix, n_step_max=10))
-    #
-    #     estimate_prob = self.estimate_probabilities(node_index=2, n_products=n_products)
-    #     final_list = [self.estimate_probabilities(dataset, i, n_products) for i in range(5)]
-    #     # [0.30 0.18 0.25 0. ]
-    #     print("True P matrix:   ", prob_matrix[:, 4])
-    #     print("Estimated P matrix:  ", estimate_prob)

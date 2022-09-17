@@ -7,11 +7,11 @@ import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
-from online_pricing.influence_function import InfluenceFunctor
-from online_pricing.learner import TSLearner
-from online_pricing.user import User
-from online_pricing.utils import flatten, suppress_output
-from online_pricing.wishart import WishartHandler
+from online_pricing.common.influence_function import InfluenceFunctor
+from online_pricing.helpers.utils import flatten, suppress_output
+from online_pricing.helpers.wishart import WishartHandler
+from online_pricing.models.learner import TSLearner
+from online_pricing.models.user import User
 
 
 class EnvironmentBase:
@@ -85,7 +85,7 @@ class EnvironmentBase:
             # end of product_graph matrices list
             # N.B. client graph probabilities are included in the Social Influece class
         }
-        self.mean_product_graph = list[float]()
+        self.mean_product_graph = list[list[float]]()
         self.influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
 
         # initialise R session
