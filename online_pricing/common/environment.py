@@ -119,7 +119,7 @@ class EnvironmentBase:
         utils = importr("utils")
         utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
         utils.install_packages("roahd")
-        with open("online_pricing/initialise_R.R", "r") as file:
+        with open("online_pricing/r/initialise_R.R", "r") as file:
             code = file.read().rstrip()
             robjects.r(code)
 

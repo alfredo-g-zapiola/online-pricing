@@ -192,14 +192,14 @@ class Simulator(object):
         # We need to return the history of jumpes between pages, but just the information about
         # the landing page, meaning we need to know if the user viewed the first and/or second secondary products.
         history = influence_episodes[:3]
-        prepare_episode = [history[0] if buys[client.landing_product] else [0 for _ in range(self.environment.n_products)]]
+        prepare_episode = [history[0] if buys[client.landing_product] else [0] * self.environment.n_products]
 
         prepare_episode.append(
             sum_by_element(history[-1], history[0], difference=True) if buys[client.landing_product] else [-1]
         )
 
         # Return history records
-        return buys, [episode for episode in prepare_episode if episode is not [-1]]
+        return buys, [episode for episode in prepare_episode if episode != [-1]]
 
     def update_learners(self, buys: list[int], prices: list[float]) -> None:
         """
