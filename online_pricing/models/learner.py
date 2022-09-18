@@ -231,6 +231,9 @@ class CGLearner:
 
         return self.learners[row][column].sample_arm(arm_id)
 
+    def get_arm(self, price: float) -> int:
+        return self.prices.index(price)
+
 
 LEARNERS: dict[str, Type[Learner]] = {
     "UCB": UCBLearner,

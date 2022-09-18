@@ -71,3 +71,7 @@ def print_matrix(matrix: list[list[float | int]], indexes: bool = False) -> None
 
 def int_to_features(num: int) -> list[int]:
     return [int(feature) for feature in f"{num:02b}"]
+
+
+def mean(my_list: Any) -> float:
+    return sum(my_list) / len(my_list)

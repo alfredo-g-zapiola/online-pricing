@@ -6,7 +6,7 @@ from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import sum_by_element
+from online_pricing.helpers.utils import int_to_features, mean, sum_by_element
 from online_pricing.models.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.models.user import User
 
@@ -47,10 +47,7 @@ class Simulator(object):
         self.learners = list[Learner]()
         for idx in range(self.environment.n_products):
             learner_factory.base_args = (self.environment.n_products, self.prices[idx])
-            if self.environment.context_generation:
-                self.learners = [learner_factory.get_learner()] * self.environment.n_products
-            else:
-                self.learners.append(learner_factory.get_learner())
+            self.learners.append(learner_factory.get_learner())
 
         self.social_influence = SocialInfluence(
             self.environment.n_products, secondaries=self.secondaries, lambda_param=self._lambda
@@ -107,7 +104,7 @@ class Simulator(object):
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
-
+        #
         # print("\n =========== DAY OVER ===========")
         # print("Products sold:", products_sold)
         # print("Current prices:", self.current_prices)
@@ -223,9 +220,9 @@ class Simulator(object):
         for idx, bought in enumerate(did_buy):
             self.learners[idx].update(arms_pulled[idx], bought, features)
 
-    def conversion_rate(self, product_id: int, prices: list[float]) -> float:
-        if self.environment.unknown_demand_curve:
-            return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
+    def conversion_rate(self, product_id: int, prices: list[float], features: list[int] | None = None) -> float:
+        if not self.environment.unknown_demand_curve:
+            return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
         else:
             # note we have to take the average conversion rate, so we weight the c_rate of each group
             # save old value
@@ -259,7 +256,7 @@ class Simulator(object):
             return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
     def mean_quantity_bought(self) -> float:
-        if not self.environment.context_generation:
+        if not self.environment.context_generation or True:  # TODO Develop CG
             if self.environment.unknown_quantity_bought:
                 return self.quantity_learners[0].sample_arm(0)
             else:
@@ -286,52 +283,93 @@ class Simulator(object):
         """
         products = range(self.environment.n_products)
         n_prices = len(self.prices[0])
-
         best_configuration = [0] * self.environment.n_products
-        current_target = self.objective_function([self.prices[product_id][0] for product_id in products])
-        has_changed = True
-        while has_changed:
-            has_changed = False
-            for price_to_increase in products:
 
-                new_configuration = best_configuration.copy()
-                # While checking that the index doesn't exceed the number of prices available
-                if new_configuration[price_to_increase] >= n_prices - 1:
-                    continue
-                # Increase the price
-                new_configuration[price_to_increase] += 1
+        if not self.environment.context_generation:
+            alpha_ratios = cast(list[float], self.expected_alpha_r)
+            current_target = self.objective_function([self.prices[product_id][0] for product_id in products], alpha_ratios)
+            has_changed = True
+            while has_changed:
+                has_changed = False
+                for price_to_increase in products:
 
-                new_target = self.objective_function(
-                    [self.prices[product_id][new_configuration[product_id]] for product_id in products]
-                )
-                # If objective value is higher, update the configuration
-                if new_target > current_target:
-                    best_configuration = new_configuration
-                    current_target = new_target
-                    has_changed = True
+                    new_configuration = best_configuration.copy()
+                    # While checking that the index doesn't exceed the number of prices available
+                    if new_configuration[price_to_increase] >= n_prices - 1:
+                        continue
+                    # Increase the price
+                    new_configuration[price_to_increase] += 1
+
+                    new_target = self.objective_function(
+                        [self.prices[product_id][new_configuration[product_id]] for product_id in products], alpha_ratios
+                    )
+                    # If objective value is higher, update the configuration
+                    if new_target > current_target:
+                        best_configuration = new_configuration
+                        current_target = new_target
+                        has_changed = True
+
+        else:
+            alpha_ratios_groups = cast(list[list[float]], self.expected_alpha_r)
+            current_target = mean(
+                [
+                    self.objective_function(
+                        [self.prices[product_id][0] for product_id in products], alpha_ratios_groups[group]
+                    )
+                    for group in range(self.environment.n_groups)
+                ]
+            )
+            has_changed = True
+            while has_changed:
+                has_changed = False
+                for price_to_increase in products:
+
+                    new_configuration = best_configuration.copy()
+                    # While checking that the index doesn't exceed the number of prices available
+                    if new_configuration[price_to_increase] >= n_prices - 1:
+                        continue
+                    # Increase the price
+                    new_configuration[price_to_increase] += 1
+
+                    new_target = mean(
+                        [
+                            self.objective_function(
+                                [self.prices[product_id][new_configuration[product_id]] for product_id in products],
+                                alpha_ratios_groups[group],
+                                group,
+                            )
+                            for group in range(self.environment.n_groups)
+                        ]
+                    )
+                    # If objective value is higher, update the configuration
+                    if new_target > current_target:
+                        best_configuration = new_configuration
+                        current_target = new_target
+                        has_changed = True
 
         return best_configuration
 
-    # TODO(film): add group support and check this (coded too fast)
+    def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
 
-    def objective_function(self, prices: list[float]) -> float:
+        features = None
+        if group is not None:
+            features = int_to_features(group)
 
         current_margins = [
             self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)
         ]
-        alpha_ratios = cast(list[float], self.expected_alpha_r)
-
         if self.environment.unknown_demand_curve:  # use the estimates
             conversion_rates = [
-                self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]))
+                self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
                 for product_id in range(self.environment.n_products)
             ]
         else:
 
             def c_rate(prod_id: int) -> float:
-                return self.conversion_rate(prod_id, prices=prices)
+                return self.conversion_rate(prod_id, prices=prices, features=features)
 
             conversion_rates = [c_rate(product_id) for product_id in range(self.environment.n_products)]
+
         return sum(
             [
                 alpha_ratios[product_id + 1]
