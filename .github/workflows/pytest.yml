@@ -6,9 +6,8 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    name: Pytest
     steps:
     #----------------------------------------------
     #       check-out repo and set-up python
