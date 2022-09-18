@@ -1,4 +1,4 @@
-name: Checks
+name: Pytest
 on:
   push:
     branches:
@@ -6,8 +6,12 @@ on:
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
-    name: Checks
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+
     steps:
     #----------------------------------------------
     #       check-out repo and set-up python
@@ -48,8 +52,6 @@ jobs:
     #----------------------------------------------
     # run checks
     #----------------------------------------------
-    - run: poetry run black --diff --check $(git ls-files '*.py')
-    - run: poetry run mypy --strict $(git ls-files '*.py')
-    - run: poetry run isort $(git ls-files '*.py') --check-only --diff
-    - run: poetry run flake8 $(git ls-files '*.py') --count --show-source --statistics
-    - run: poetry run flake8 $(git ls-files '*.py') --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    -
+    - name: Test with pytest
+      run: poetry run pytest
