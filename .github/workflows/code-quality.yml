@@ -48,5 +48,5 @@ jobs:
     #----------------------------------------------
     # run checks
     #----------------------------------------------
-    - run: black --diff --check $(git ls-files '*.py')
-    - run: mypy --strict $(git ls-files '*.py')
+    - run: poetry run black --diff --check $(git ls-files '*.py')
+    - run: poetry run mypy --strict $(git ls-files '*.py')
