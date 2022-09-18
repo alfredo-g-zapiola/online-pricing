@@ -14,6 +14,6 @@ jobs:
       with:
         python-version: '3.10'
     - run: pip install --upgrade pip
-    - run: pip install "black==22.3.0"  mypy==v0.950 flake8==4.0.1
+    - run: pip install "black==22.3.0"  mypy==v0.950 flake8==4.0.1 numpy==1.22.3
     - run: black --diff --check $(git ls-files '*.py')
     - run: mypy --strict $(git ls-files '*.py')
