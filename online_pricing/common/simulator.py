@@ -1,11 +1,12 @@
 import random
 from collections import deque, namedtuple
-from typing import Any, Deque, TypeVar, cast
+from typing import Any, Deque, cast
 
 from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
+from online_pricing.helpers.utils import sum_by_element
 from online_pricing.models.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.models.user import User
 
@@ -42,10 +43,14 @@ class Simulator(object):
         self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
 
         # Learners #
+
         self.learners = list[Learner]()
         for idx in range(self.environment.n_products):
             learner_factory.base_args = (self.environment.n_products, self.prices[idx])
-            self.learners.append(learner_factory.get_learner())
+            if self.environment.context_generation:
+                self.learners = [learner_factory.get_learner()] * self.environment.n_products
+            else:
+                self.learners.append(learner_factory.get_learner())
 
         self.social_influence = SocialInfluence(
             self.environment.n_products, secondaries=self.secondaries, lambda_param=self._lambda
@@ -74,6 +79,7 @@ class Simulator(object):
         direct_clients = self.environment.get_direct_clients()
         products_sold: list[int] = [0] * self.environment.n_products
         n_users = 0
+
         for client in direct_clients:
             n_users += 1
             buys, influenced_episodes = self.sim_one_user(
@@ -83,7 +89,7 @@ class Simulator(object):
             )
             products_sold = sum_by_element(products_sold, buys)
 
-            self.update_learners(buys=buys, prices=self.current_prices)
+            self.update_learners(buys=buys, prices=self.current_prices, features=[client.feature_0, client.feature_1])
             self.social_influence.add_episode(influenced_episodes)
         # Estimate probabilities
         # Regret calculator
@@ -201,7 +207,7 @@ class Simulator(object):
         # Return history records
         return buys, [episode for episode in prepare_episode if episode != [-1]]
 
-    def update_learners(self, buys: list[int], prices: list[float]) -> None:
+    def update_learners(self, buys: list[int], prices: list[float], features: list[int]) -> None:
         """
         Update the learners with the buys of the user.
 
@@ -209,12 +215,13 @@ class Simulator(object):
 
         :param buys: list of number of units bought per product
         :param prices: prices of the products
+        :param features: features of the user
         """
         arms_pulled = [self.learners[idx].get_arm(prices[idx]) for idx in range(self.environment.n_products)]
         did_buy = [int(buy > 0) for buy in buys]
 
         for idx, bought in enumerate(did_buy):
-            self.learners[idx].update(arm_pulled=arms_pulled[idx], reward=bought)
+            self.learners[idx].update(arms_pulled[idx], bought, features)
 
     def conversion_rate(self, product_id: int, prices: list[float]) -> float:
         if self.environment.unknown_demand_curve:
@@ -363,43 +370,3 @@ class Simulator(object):
         :return: list of list of data.
         """
         return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
-
-
-MATRIX = TypeVar("MATRIX", list[int], list[list[int]])
-
-
-def sum_by_element(array_1: MATRIX, array_2: MATRIX, difference: bool = False) -> MATRIX:
-    """
-    Sum lists - or matrices - by element.
-
-    :param array_1: list or matrix to sum.
-    :param array_2: list or matrix to sum.
-    :param difference: if True, return the difference between the two arrays.
-    :return: list or matrix with the sum of the two arrays.
-    """
-    if type(array_1) is not type(array_2):
-        raise TypeError(f"Arrays must be of the same type, got {type(array_1)} and {type(array_2)}")
-
-    if isinstance(array_1[0], list):
-        return [sum_by_element(a1, a2) for a1, a2 in zip(array_1, array_2)]
-
-    if difference:
-        return [a1 - a2 for a1, a2 in zip(array_1, array_2)]
-
-    return [sum(items) for items in zip(array_1, array_2)]
-
-
-def print_matrix(matrix: list[list[float | int]], indexes: bool = False) -> None:
-    if indexes:
-        indices = ["-"] + [str(i) for i in range(1, len(matrix[0]) + 1)]
-        new_matrix = [[str(matrix[j][i]) for i in range(len(matrix[0]))] for j in range(len(matrix))]
-        new_matrix.insert(0, indices)
-        for idx in range(1, len(new_matrix)):
-            new_matrix[idx].insert(0, str(idx))
-
-        print("\n".join(["".join([f"{item} " for item in row]) for row in new_matrix]))
-
-    elif type(matrix[0][0]) == int:
-        print("\n".join(["".join([f"{item} " for item in row]) for row in matrix]))
-    else:
-        print("\n".join(["".join([f"{item:.2f} " for item in row]) for row in matrix]))

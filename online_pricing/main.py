@@ -6,7 +6,7 @@ from tqdm import tqdm
 from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.simulator import Simulator
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.models.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
+from online_pricing.models.learner import CGUCBLearner, LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
 
 warnings.filterwarnings("ignore")
 
@@ -36,12 +36,7 @@ def main(
     print()
     print()
 
-    learner_args = {
-        "window_size": 10,
-        "w": 10,
-        "beta": 10,
-        "gamma": 10,
-    }
+    learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "features": 2}
 
     learner_factory = LearnerFactory(learner, **learner_args)
 
@@ -152,6 +147,7 @@ def main(
                     hyperparameters={
                         "fully_connected": fully_connected,
                         "context_generation": True,
+                        "learner_class": CGUCBLearner,
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
