@@ -4,10 +4,10 @@ from typing import Any, Deque, cast
 
 from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.influence_function import InfluenceFunctor
+from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
 from online_pricing.helpers.utils import int_to_features, mean, sum_by_element
-from online_pricing.models.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.models.user import User
 
 
@@ -46,7 +46,7 @@ class Simulator(object):
 
         self.learners = list[Learner]()
         for idx in range(self.environment.n_products):
-            learner_factory.base_args = (self.environment.n_products, self.prices[idx])
+            learner_factory.base_args = (self.environment.n_prices, self.prices[idx])
             self.learners.append(learner_factory.get_learner())
 
         self.social_influence = SocialInfluence(
@@ -104,21 +104,11 @@ class Simulator(object):
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
-        #
-        # print("\n =========== DAY OVER ===========")
-        # print("Products sold:", products_sold)
-        # print("Current prices:", self.current_prices)
-        # print("Current margins:", current_margins)
-        # print("Mean reward per client:", mean_reward_per_client)
-        # print("Next configuration:", next_day_configuration)
-        # print("Estimated edge probabilities:")
-        # print_matrix(self.estimated_edge_probas)
-        # print("Product Graph:")
-        # print_matrix(self.environment.mean_product_graph)
-        # print("Secondaries:")
-        # print_matrix(self.secondaries, indexes=True)
-        # print("\n")
+
         self.n_day += 1
+        if self.environment.context_generation:
+            for learner in self.learners:
+                learner.new_day()
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -240,14 +230,14 @@ class Simulator(object):
             self.environment.uncertain_demand_curve = save  # ripristinarlo
             return rate
 
-    def influence_function(self, i: int, j: int, prices: list[float]) -> float:
+    def influence_function(self, i: int, j: int, prices: list[float], features: list[int]) -> float:
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
         :return:
         """
 
         def c_rate(prod_id: int) -> float:
-            return self.conversion_rate(prod_id, prices=prices)
+            return self.conversion_rate(prod_id, prices=prices, features=features)
 
         if self.environment.unknown_product_weights:
             return self.influence_functor(i, j, c_rate, self.estimated_edge_probas)
@@ -314,7 +304,7 @@ class Simulator(object):
             current_target = mean(
                 [
                     self.objective_function(
-                        [self.prices[product_id][0] for product_id in products], alpha_ratios_groups[group]
+                        [self.prices[product_id][0] for product_id in products], alpha_ratios_groups[group], group
                     )
                     for group in range(self.environment.n_groups)
                 ]
@@ -377,7 +367,7 @@ class Simulator(object):
                     conversion_rates[product_id] * current_margins[product_id] * self.mean_quantity_bought()
                     + sum(
                         [
-                            self.influence_function(product_id, secondary_product_id, prices)
+                            self.influence_function(product_id, secondary_product_id, prices, features)
                             * conversion_rates[secondary_product_id]
                             * current_margins[secondary_product_id]
                             * self.mean_quantity_bought()
@@ -407,4 +397,12 @@ class Simulator(object):
 
         :return: list of list of data.
         """
-        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
+        # TODO see if these implementation makes sense, namely the mean of the groups
+        features = [int_to_features(group) for group in range(self.environment.n_groups)]
+        return [
+            [
+                mean([learner.sample_arm(price, feature) for feature in features])
+                for price in range(self.environment.n_prices)
+            ]
+            for learner in self.learners
+        ]

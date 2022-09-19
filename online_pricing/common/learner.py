@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 from online_pricing.helpers.utils import flatten, sum_by_element
+from online_pricing.models.rewards_and_features import RewardsAndFeatures
 
 
 class Learner(ABC):
@@ -166,36 +167,35 @@ class CGUCBLearner(UCBLearner):
     def __init__(self, n_arms: int, prices: list[float], features: int) -> None:
         super().__init__(n_arms, prices)
         self.features = features
-        self.rewards_per_arm_with_features: list[list[tuple[int, list[list[int]]]]] = [[] for _ in range(n_arms)]
+        self.rewards_per_arm_with_features: list[list[RewardsAndFeatures]] = [[] for _ in range(n_arms)]
 
-    def update(self, arm_pulled: int, reward: int, *args: Any, features: list[int] | None = None) -> None:
+    def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
+        features = args[0]
         super().update(arm_pulled, reward)
         if features is None:
             raise ValueError(f"Features cannot be None: {features}")
 
-        episodes_features = [[0, 1] if features[idx] else [1, 0] for idx in range(len(features))]
-        self.rewards_per_arm_with_features[arm_pulled].append((reward, episodes_features))
+        self.rewards_per_arm_with_features[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
 
 class CGLearner:
-    def __init(self, n_arms: int, prices: list[float], context_window: int, features: int) -> None:
+    def __init__(self, n_arms: int, prices: list[float], context_window: int, features: int) -> None:
         self.n_arms = n_arms
         self.prices = prices
+        self.n_features = features
         self.context_window = context_window
         self.features_count = [[0] for _ in range(features)]
-        self.learners = [[CGUCBLearner(n_arms, prices, features)] * features] * features
-        self.features_split = np.zeros(features)
-        self.t = 0
+        self.learners = np.full(shape=[2] * features, fill_value=CGUCBLearner(n_arms, prices, features))
+        self.is_split_feature = np.zeros(features, dtype=np.int)
+        self.t = 1
 
     def update(self, arm_pulled: int, reward: int, features: list[int] | None = None) -> None:
-        self.t += 1
         if features is None:
             raise ValueError(f"Features cannot be None: {features}")
-        for idx, feature in enumerate(features):
-            if self.features_split[idx]:
-                self.learners[idx][feature].update(arm_pulled, reward)
+        self.learners[tuple(self.is_split_feature)].update(arm_pulled, reward, features)
 
-        self.learners[0][0].update(arm_pulled, reward)
+        if any(self.is_split_feature):
+            self.learners[0][0].update(arm_pulled, reward, features)  # This is the aggregated learner
 
         features_matrix = [[0, 1] if features[idx] else [1, 0] for idx in range(len(features))]
         sum_by_element(self.features_count, features_matrix)
@@ -203,13 +203,16 @@ class CGLearner:
         if self.t % self.context_window == 0:
             self.generate_context()
 
+    def new_day(self) -> None:
+        self.t += 1
+
     def generate_context(self) -> None:
-        for idx, feature_to_split in enumerate(self.features_split):
+        for idx, feature_to_split in enumerate(self.is_split_feature):
             if np.random.random() < np.random.uniform() and not feature_to_split:
                 self.split_learners(feature_to_split=idx)
 
     def split_learners(self, feature_to_split: int) -> None:
-        data = np.zeros(self.features_split.shape)
+        data = np.ndarray(shape=[2] * self.n_features, dtype=object)
         for row, feature_learners in enumerate(self.learners):
             for column, learner in enumerate(feature_learners):
                 data[row][column] = learner.rewards_per_arm_with_features
@@ -219,15 +222,18 @@ class CGLearner:
     def train_learners(self, feature_to_split: int, data: npt.NDArray[np.float64]) -> None:
         overall_data = flatten(data)
         learners = self.learners[feature_to_split]
-
         for episode in overall_data:
+            print("1")
             for arm, rewards_and_features in enumerate(episode):
-                reward, features = rewards_and_features
-                learners[features.index(1)].update(arm, reward)
+                print("2")
+                print(rewards_and_features)
+                for reward_and_features in rewards_and_features:
+                    reward, features = reward_and_features.reward, reward_and_features.features
+                    learners[features[feature_to_split]].update(arm, reward, features)
 
     def sample_arm(self, arm_id: int, features: list[int]) -> float:
-        row = features[0] if self.features_split[features[0]] else 0
-        column = features[1] if self.features_split[features[1]] else 0
+        row = features[0] if self.is_split_feature[features[0]] else 0
+        column = features[1] if self.is_split_feature[features[1]] else 0
 
         return self.learners[row][column].sample_arm(arm_id)
 
@@ -235,12 +241,12 @@ class CGLearner:
         return self.prices.index(price)
 
 
-LEARNERS: dict[str, Type[Learner]] = {
+LEARNERS: dict[str, Type[Any]] = {
     "UCB": UCBLearner,
     "TS": TSLearner,
     "SWUCB": SWUCBLearner,
     "MUCB": MUCBLearner,
-    "CGUCB": CGUCBLearner,
+    "CGUCB": CGLearner,
 }
 
 
@@ -252,6 +258,7 @@ class LearnerFactory:
         w: float | None = None,
         beta: float | None = None,
         gamma: float | None = None,
+        context_window: int | None = None,
         features: int | None = None,
     ) -> None:
         self._args: tuple[Any, ...] | None = None
@@ -264,7 +271,10 @@ class LearnerFactory:
             case "UCB":
                 self._specific_args = tuple()
             case "CGUCB":
-                self._specific_args = (features,)
+                self._specific_args = (
+                    context_window,
+                    features,
+                )
             case "SWUCB":
                 if window_size is None:
                     raise ValueError("window_size must be provided for SWUCB")

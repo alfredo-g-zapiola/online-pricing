@@ -3,7 +3,7 @@ from typing import cast
 import numpy as np
 import numpy.typing as npt
 
-from online_pricing.models.learner import Learner, TSLearner
+from online_pricing.common.learner import Learner, TSLearner
 
 
 class SocialInfluence:

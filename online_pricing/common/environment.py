@@ -9,9 +9,9 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 from online_pricing.common.influence_function import InfluenceFunctor
+from online_pricing.common.learner import TSLearner
 from online_pricing.helpers.utils import flatten, suppress_output
 from online_pricing.helpers.wishart import WishartHandler
-from online_pricing.models.learner import TSLearner
 from online_pricing.models.user import User
 
 

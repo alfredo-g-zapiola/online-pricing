@@ -4,9 +4,9 @@ import click
 from tqdm import tqdm
 
 from online_pricing.common.environment import EnvironmentBase
+from online_pricing.common.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
 from online_pricing.common.simulator import Simulator
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.models.learner import CGUCBLearner, LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
 
 warnings.filterwarnings("ignore")
 
@@ -35,10 +35,6 @@ def main(
     print(" !==============================! Simulation Starting !==============================! ")
     print()
     print()
-
-    learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "features": 2}
-
-    learner_factory = LearnerFactory(learner, **learner_args)
 
     if step is None:
         step = int(input("Step to be run: "))
@@ -147,7 +143,7 @@ def main(
                     hyperparameters={
                         "fully_connected": fully_connected,
                         "context_generation": True,
-                        "learner_class": CGUCBLearner,
+                        "learner_class": "CGUCB",
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
@@ -157,7 +153,7 @@ def main(
                         "unknown_quantity_bought": False,
                         "uncertain_product_weights": False,
                         "unknown_product_weights": False,
-                        "shifting_demand_curve": True,
+                        "shifting_demand_curve": False,
                     },
                 ),
             ]
@@ -166,6 +162,9 @@ def main(
             raise ValueError(f"Step {step} does not exists.")
 
     for environment in environments:
+        learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "context_window": 14, "features": 2}
+        learner_factory = LearnerFactory(environment.learner_class, **learner_args)
+
         tracer = Tracer(n_sims, n_days)
         run_simulator(n_sims, n_days, environment, tracer, learner_factory)
         if not no_plot:

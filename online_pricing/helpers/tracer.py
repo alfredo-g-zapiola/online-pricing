@@ -1,3 +1,5 @@
+from typing import cast
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +15,7 @@ def moving_average(avg_rewards: list[float] | npt.NDArray[np.float32]) -> list[f
     for idx in range(window - 1):
         average.insert(idx, np.mean(avg_rewards[0 : 0 + idx]))
 
-    return average
+    return cast(list[float], average)
 
 
 class Tracer:
