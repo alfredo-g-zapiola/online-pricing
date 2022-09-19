@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Type
+from typing import Any, Type, cast
 
 import numpy as np
-import numpy.typing as npt
 
-from online_pricing.helpers.utils import flatten, sum_by_element
+from online_pricing.helpers.utils import sum_by_element
 from online_pricing.models.rewards_and_features import RewardsAndFeatures
 
 
@@ -20,9 +19,8 @@ class Learner(ABC):
         self.pulled_arms: list[int] = []
 
     @property
-    @abstractmethod
     def parameters(self) -> list[tuple[float, ...]]:
-        pass
+        raise TypeError("Parameters not implemented for this learner.")
 
     @abstractmethod
     def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
@@ -41,6 +39,9 @@ class Learner(ABC):
     def mean_arm(self, arm_id: int) -> float:
         pass
 
+    def new_day(self) -> None:
+        self.t += 1
+
 
 class UCBLearner(Learner):
     def __init__(self, n_arms: int, prices: list[float]):
@@ -57,7 +58,7 @@ class UCBLearner(Learner):
 
     def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
         super().update(arm_pulled, reward)
-        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled])
+        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled]).astype(float)
         for idx in range(self.n_arms):
             n = len(self.rewards_per_arm[idx])
             if n > 0:
@@ -111,7 +112,7 @@ class SWUCBLearner(UCBLearner):
         self.rewards_per_arm[arm_pulled].append(reward)
         self.pulled_arms.append(arm_pulled)
 
-        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled][-self.window_size :])
+        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled][-self.window_size :]).astype(float)
         for idx in range(self.n_arms):
             n = len(self.rewards_per_arm[idx][-self.window_size :])
             if n > 0:
@@ -136,7 +137,7 @@ class MUCBLearner(UCBLearner):
     def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
         super(UCBLearner, self).update(arm_pulled, reward)
 
-        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled])
+        self.means[arm_pulled] = np.mean(self.rewards_per_arm[arm_pulled]).astype(float)
         for idx in range(self.n_arms):
             n = len(self.rewards_per_arm[idx])
             if n > 0:
@@ -163,27 +164,56 @@ class MUCBLearner(UCBLearner):
         return int(idx)
 
 
-class CGLearner:
-    def __init__(self, n_arms: int, prices: list[float], context_window: int, features: int) -> None:
-        self.n_arms = n_arms
-        self.prices = prices
-        self.n_features = features
+class CGLearner(Learner):
+    """
+    Class that manages the context generation algorithm.
+
+    It's characterized by instance learners that gets updated whenever there's a context split.
+    In particular, having binary features this class will have 2^d learners, where d is the number of features.
+    Each learner correspond to a set of features, and it's considered active if that particular features has been
+    split. A feature is split after a condition is met, until then, all the non-split features are considered
+    aggregated.
+    """
+
+    def __init__(self, n_arms: int, prices: list[float], context_window: int, n_features: int) -> None:
+        """
+        :param n_arms: the number of arms
+        :param prices: the prices of the arms
+        :param context_window: the size of the context window
+        :param features: the number of features
+        """
+        super().__init__(n_arms, prices)
+        self.n_features = n_features
         self.context_window = context_window
-        self.features_count = [[0] for _ in range(features)]
+        self.features_count = [[0] for _ in range(n_features)]
 
         self.learners = self.initialize_learners()
 
-        self.is_split_feature = np.zeros(features, dtype=np.int8)
-        self.training_data = [[] for _ in range(n_arms)]
-        self.t = 1
+        self.is_split_feature = np.zeros(n_features, dtype=np.int8)
+        self.training_data: list[list[RewardsAndFeatures]] = [[] for _ in range(n_arms)]
 
-    def new_day(self) -> None:
-        self.t += 1
+    def initialize_learners(self) -> Any:
+        """Initialize learners."""
+        learners = np.full(shape=[2] * self.n_features, fill_value=None, dtype=UCBLearner)
+        initialize_learners = learners.flatten()
+        for idx in range(len(initialize_learners)):
+            initialize_learners[idx] = UCBLearner(self.n_arms, self.prices)
+        return initialize_learners.reshape(learners.shape)
 
-    def update(self, arm_pulled: int, reward: int, features: list[int] | None = None) -> None:
+    def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
+        """
+        Update the learners.
+
+        :param arm_pulled: the arm pulled
+        :param reward: the reward
+        :param args: features must be added here
+        """
+        features: list[int] = args[0]
         if features is None:
             raise ValueError(f"Features cannot be None: {features}")
-        self.learners[tuple(self.is_split_feature)].update(arm_pulled, reward, features)
+        self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].update(
+            arm_pulled, reward, features
+        )
 
         features_matrix = np.zeros(shape=[2] * self.n_features, dtype=np.int8)
         features_matrix[tuple(features)] = 1
@@ -191,37 +221,46 @@ class CGLearner:
 
         self.training_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
+    def new_day(self) -> None:
+        """New day, see if context split is needed."""
+        self.t += 1
         if self.t % self.context_window == 0:
             self.generate_context()
 
     def generate_context(self) -> None:
+        """Make decision to split a feature or not"""
         for idx, feature_to_split in enumerate(self.is_split_feature):
-            if np.random.random() < 0.2 and not feature_to_split:
+            if np.random.random() < 0.5 and not feature_to_split:
                 self.is_split_feature[idx] = 1
                 self.train_learners()
 
-    def initialize_learners(self) -> Any:
-        learners = np.full(shape=[2] * self.n_features, fill_value=None, dtype=UCBLearner)
-        initialize_learners = learners.flatten()
-        for idx in range(len(initialize_learners)):
-            initialize_learners[idx] = UCBLearner(self.n_arms, self.prices)
-        return initialize_learners.reshape(learners.shape)
-
     def train_learners(self) -> None:
+        """Train new learners on the training data stored."""
         self.learners = self.initialize_learners()
         for arm, episode in enumerate(self.training_data):
             for reward_and_features in episode:
                 reward, features = reward_and_features.reward, reward_and_features.features
                 self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].update(arm, reward)
 
-    def sample_arm(self, arm_id: int, features: list[int]) -> float:
-        return self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].sample_arm(arm_id)
+    def sample_arm(self, arm_id: int, *args: Any) -> float:
+        """
+        Sample an arm.
+
+        The choice of which learner to pull is based on split features. If a feature is not split, it's considered
+        aggregated, so the learner chosen the aggregated learner of that feature.
+        """
+        features: list[int] = args[0]
+        arm_sampled = self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].sample_arm(
+            arm_id
+        )
+
+        return cast(float, arm_sampled)
 
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
 
 
-LEARNERS: dict[str, Type[Any]] = {
+LEARNERS: dict[str, Type[Learner]] = {
     "UCB": UCBLearner,
     "TS": TSLearner,
     "SWUCB": SWUCBLearner,
@@ -239,7 +278,7 @@ class LearnerFactory:
         beta: float | None = None,
         gamma: float | None = None,
         context_window: int | None = None,
-        features: int | None = None,
+        n_features: int | None = None,
     ) -> None:
         self._args: tuple[Any, ...] | None = None
         self.learner = LEARNERS[learner_class]
@@ -253,7 +292,7 @@ class LearnerFactory:
             case "CGUCB":
                 self._specific_args = (
                     context_window,
-                    features,
+                    n_features,
                 )
             case "SWUCB":
                 if window_size is None:
@@ -281,7 +320,4 @@ class LearnerFactory:
         self._args = value
 
     def get_learner(self) -> Learner:
-        try:
-            return self.learner(*self.args)
-        except TypeError as e:
-            raise TypeError(f"Invalid arguments for {self.learner.__name__}: {self.args}") from e
+        return self.learner(*self.args)

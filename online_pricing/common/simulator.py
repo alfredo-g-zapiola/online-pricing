@@ -246,7 +246,7 @@ class Simulator(object):
             return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
     def mean_quantity_bought(self) -> float:
-        if not self.environment.context_generation or True:  # TODO Develop CG
+        if self.environment.context_generation or True:  # TODO Develop CG
             if self.environment.unknown_quantity_bought:
                 return self.quantity_learners[0].sample_arm(0)
             else:
@@ -341,9 +341,10 @@ class Simulator(object):
 
     def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
 
-        features = None
-        if group is not None:
-            features = int_to_features(group)
+        if group is None:
+            raise Exception("param group cannot be None")
+
+        features = int_to_features(group)
 
         current_margins = [
             self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)

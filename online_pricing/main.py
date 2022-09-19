@@ -162,7 +162,7 @@ def main(
             raise ValueError(f"Step {step} does not exists.")
 
     for environment in environments:
-        learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "context_window": 14, "features": 2}
+        learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "context_window": 14, "n_features": 2}
         learner_factory = LearnerFactory(environment.learner_class, **learner_args)
 
         tracer = Tracer(n_sims, n_days)

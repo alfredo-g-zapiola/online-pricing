@@ -1,29 +1,50 @@
 import io
+import itertools
 import logging
 import sys
+import threading
+import time
 from functools import wraps
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import numpy.typing as npt
 
 
+def animate(prefix: str, stop: Callable[[], bool], stdout: Any) -> None:
+    while True:
+        for c in itertools.cycle(["|", "/", "-", "\\"]):
+            old_stdout = sys.stdout
+            sys.stdout = stdout
+            print(prefix + c, end="\r")
+            sys.stdout = old_stdout
+            time.sleep(0.2)
+            if stop():
+                return
+
+
 def suppress_output(func: Any) -> Any:
     @wraps(func)
     def inner(*args: Any, **kwds: Any) -> None:
-        print(f"Running function: {func.__name__} \n")
+
         # Disable logging
         logging.disable(logging.CRITICAL)
         # Disable stdout
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
 
-        func(*args, **kwds)
+        stop_threads = False
+        t = threading.Thread(target=animate, args=(f"Running function: {func.__name__} ", lambda: stop_threads, old_stdout))
+        t.start()
 
+        func(*args, **kwds)
         # Restore stdout
         sys.stdout = old_stdout
         # Restore logging
         logging.disable(logging.NOTSET)
+
+        stop_threads = True
+        t.join()
 
     return inner
 
