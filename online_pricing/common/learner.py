@@ -163,21 +163,6 @@ class MUCBLearner(UCBLearner):
         return int(idx)
 
 
-class CGUCBLearner(UCBLearner):
-    def __init__(self, n_arms: int, prices: list[float], features: int) -> None:
-        super().__init__(n_arms, prices)
-        self.features = features
-        self.rewards_per_arm_with_features: list[list[RewardsAndFeatures]] = [[] for _ in range(n_arms)]
-
-    def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
-        features = args[0]
-        super().update(arm_pulled, reward)
-        if features is None:
-            raise ValueError(f"Features cannot be None: {features}")
-
-        self.rewards_per_arm_with_features[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
-
-
 class CGLearner:
     def __init__(self, n_arms: int, prices: list[float], context_window: int, features: int) -> None:
         self.n_arms = n_arms
@@ -185,57 +170,52 @@ class CGLearner:
         self.n_features = features
         self.context_window = context_window
         self.features_count = [[0] for _ in range(features)]
-        self.learners = np.full(shape=[2] * features, fill_value=CGUCBLearner(n_arms, prices, features))
-        self.is_split_feature = np.zeros(features, dtype=np.int)
+
+        self.learners = self.initialize_learners()
+
+        self.is_split_feature = np.zeros(features, dtype=np.int8)
+        self.training_data = [[] for _ in range(n_arms)]
         self.t = 1
+
+    def new_day(self) -> None:
+        self.t += 1
 
     def update(self, arm_pulled: int, reward: int, features: list[int] | None = None) -> None:
         if features is None:
             raise ValueError(f"Features cannot be None: {features}")
         self.learners[tuple(self.is_split_feature)].update(arm_pulled, reward, features)
 
-        if any(self.is_split_feature):
-            self.learners[0][0].update(arm_pulled, reward, features)  # This is the aggregated learner
+        features_matrix = np.zeros(shape=[2] * self.n_features, dtype=np.int8)
+        features_matrix[tuple(features)] = 1
+        sum_by_element(self.features_count, features_matrix.tolist())
 
-        features_matrix = [[0, 1] if features[idx] else [1, 0] for idx in range(len(features))]
-        sum_by_element(self.features_count, features_matrix)
+        self.training_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
         if self.t % self.context_window == 0:
             self.generate_context()
 
-    def new_day(self) -> None:
-        self.t += 1
-
     def generate_context(self) -> None:
         for idx, feature_to_split in enumerate(self.is_split_feature):
-            if np.random.random() < np.random.uniform() and not feature_to_split:
-                self.split_learners(feature_to_split=idx)
+            if np.random.random() < 0.2 and not feature_to_split:
+                self.is_split_feature[idx] = 1
+                self.train_learners()
 
-    def split_learners(self, feature_to_split: int) -> None:
-        data = np.ndarray(shape=[2] * self.n_features, dtype=object)
-        for row, feature_learners in enumerate(self.learners):
-            for column, learner in enumerate(feature_learners):
-                data[row][column] = learner.rewards_per_arm_with_features
+    def initialize_learners(self) -> Any:
+        learners = np.full(shape=[2] * self.n_features, fill_value=None, dtype=UCBLearner)
+        initialize_learners = learners.flatten()
+        for idx in range(len(initialize_learners)):
+            initialize_learners[idx] = UCBLearner(self.n_arms, self.prices)
+        return initialize_learners.reshape(learners.shape)
 
-        self.train_learners(feature_to_split, data)
-
-    def train_learners(self, feature_to_split: int, data: npt.NDArray[np.float64]) -> None:
-        overall_data = flatten(data)
-        learners = self.learners[feature_to_split]
-        for episode in overall_data:
-            print("1")
-            for arm, rewards_and_features in enumerate(episode):
-                print("2")
-                print(rewards_and_features)
-                for reward_and_features in rewards_and_features:
-                    reward, features = reward_and_features.reward, reward_and_features.features
-                    learners[features[feature_to_split]].update(arm, reward, features)
+    def train_learners(self) -> None:
+        self.learners = self.initialize_learners()
+        for arm, episode in enumerate(self.training_data):
+            for reward_and_features in episode:
+                reward, features = reward_and_features.reward, reward_and_features.features
+                self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].update(arm, reward)
 
     def sample_arm(self, arm_id: int, features: list[int]) -> float:
-        row = features[0] if self.is_split_feature[features[0]] else 0
-        column = features[1] if self.is_split_feature[features[1]] else 0
-
-        return self.learners[row][column].sample_arm(arm_id)
+        return self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].sample_arm(arm_id)
 
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
