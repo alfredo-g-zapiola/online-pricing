@@ -47,6 +47,7 @@ def main(
                     n_groups=3,
                     hyperparameters={
                         "fully_connected": fully_connected,
+                        "learner_class": "TS",
                         "context_generation": False,
                         "uncertain_alpha": False,
                         "group_unknown": True,
@@ -68,6 +69,7 @@ def main(
                     n_groups=3,
                     hyperparameters={
                         "fully_connected": fully_connected,
+                        "learner_class": "TS",
                         "context_generation": False,
                         "uncertain_alpha": True,
                         "group_unknown": True,
@@ -88,6 +90,7 @@ def main(
                     n_groups=3,
                     hyperparameters={
                         "fully_connected": fully_connected,
+                        "learner_class": "TS",
                         "context_generation": False,
                         "uncertain_alpha": False,
                         "group_unknown": True,
@@ -104,6 +107,7 @@ def main(
         case 6:
             base_parameters = {
                 "fully_connected": fully_connected,
+                "learner_class": "TS",
                 "context_generation": False,
                 "uncertain_alpha": False,
                 "group_unknown": True,

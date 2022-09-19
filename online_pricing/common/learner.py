@@ -230,7 +230,8 @@ class CGLearner(Learner):
     def generate_context(self) -> None:
         """Make decision to split a feature or not"""
         for idx, feature_to_split in enumerate(self.is_split_feature):
-            if np.random.random() < 0.5 and not feature_to_split:
+            # TODO: choose how to split
+            if np.random.random() < 0.3 and not feature_to_split:
                 self.is_split_feature[idx] = 1
                 self.train_learners()
 
@@ -253,7 +254,6 @@ class CGLearner(Learner):
         arm_sampled = self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].sample_arm(
             arm_id
         )
-
         return cast(float, arm_sampled)
 
     def get_arm(self, price: float) -> int:

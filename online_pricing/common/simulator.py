@@ -246,19 +246,16 @@ class Simulator(object):
             return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
 
     def mean_quantity_bought(self) -> float:
-        if self.environment.context_generation or True:  # TODO Develop CG
-            if self.environment.unknown_quantity_bought:
-                return self.quantity_learners[0].sample_arm(0)
-            else:
-                return sum(
-                    [
-                        self.environment.distributions_parameters["quantity_demanded_params"][g]
-                        * self.environment.group_proportions[g]
-                        for g in range(self.environment.n_groups)
-                    ]
-                )
+        if self.environment.unknown_quantity_bought:
+            return self.quantity_learners[0].sample_arm(0)
         else:
-            raise Exception("Need to develop context generation case")
+            return sum(
+                [
+                    self.environment.distributions_parameters["quantity_demanded_params"][g]
+                    * self.environment.group_proportions[g]
+                    for g in range(self.environment.n_groups)
+                ]
+            )
 
     def greedy_algorithm(self) -> list[int]:
         """
@@ -321,6 +318,7 @@ class Simulator(object):
                     # Increase the price
                     new_configuration[price_to_increase] += 1
 
+                    # TODO media pesata
                     new_target = mean(
                         [
                             self.objective_function(
@@ -342,7 +340,7 @@ class Simulator(object):
     def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
 
         if group is None:
-            raise Exception("param group cannot be None")
+            group = 0
 
         features = int_to_features(group)
 

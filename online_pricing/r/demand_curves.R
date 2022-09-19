@@ -87,6 +87,8 @@ a <- lm(c(cr.echo,.9) ~  + I(df$echo_dot))
 lines(df$echo_dot, predict(a, I(df$echo_dot)))
 #The true function is thus
 echo_dot <- function(p){0.83900346 - 0.01589725 *p}
+lines(df$echo_dot, sapply(df$echo_dot, echo_dot_rich  ))
+
 echo_dot_rich <- function(p){ 1 -  0.01589725*.8 *p}
 lines(df$echo_dot, sapply(df$echo_dot, echo_dot_poor  ))
 echo_dot_poor <- function(p){0.83900346*.8 - 0.01589725*1.2 *p}
@@ -100,13 +102,13 @@ echo_dot_poor <- function(p){0.83900346*.8 - 0.01589725*1.2 *p}
 set.seed(98)
 
 cr.ring <- sort(c(runif(4, 0, .5), runif(1, .7, 1)))
-cr.ring 
+cr.ring
 
-plot(df$Ring_chime, cr.ring, ylim = c(0,1), xlim=c(0,40))
-a <- lm(cr.ring ~  + I(df$echo_dot))
-lines(df$Ring_chime, predict(a, I(df$Ring_chime)))
-lines(df$Ring_chime, sapply(df$Ring_chime, ring_chime_rich  ))
-lines(df$Ring_chime, sapply(df$Ring_chime, ring_chime_poor  ))
+plot(df$ring_chime, cr.ring, ylim = c(0,1), xlim=c(0,40))
+a <- lm(cr.ring ~  + I(df$ring_chime))
+lines(df$ring_chime, predict(a, I(df$ring_chime)))
+lines(df$ring_chime, sapply(df$ring_chime, ring_chime_rich  ))
+lines(df$ring_chime, sapply(df$ring_chime, ring_chime_poor  ))
 
 ring_chime <- function(p){0.85502936 -0.02193963*p}
 ring_chime_rich <- function(p){1 -0.02193963*.7*p}
@@ -119,11 +121,11 @@ set.seed(20011999)
 cr.ring.f <- sort(c(runif(4, 0, .5), runif(1, .7, 1)))
 cr.ring.f
 
-plot(df$Ring_floodlight_cam, cr.ring.f, ylim = c(0,1), xlim=c(0,200))
-a <- lm(cr.ring.f ~  1 + I(df$Ring_floodlight_cam))
-lines(df$Ring_floodlight_cam, predict(a, I(df$Ring_floodlight_cam)))
-lines(df$Ring_floodlight_cam, sapply(df$Ring_floodlight_cam, ring_chime_f_rich))
-lines(df$Ring_floodlight_cam, sapply(df$Ring_floodlight_cam, ring_chime_f_poor))
+plot(df$ring_f, cr.ring.f, ylim = c(0,1), xlim=c(0,200))
+a <- lm(cr.ring.f ~  1 + I(df$ring_f))
+lines(df$ring_f, predict(a, I(df$ring_f)))
+lines(df$ring_f, sapply(df$ring_f, ring_f_rich))
+lines(df$ring_f, sapply(df$ring_f, ring_f_poor))
 
 ring_chime_f <- function(p){0.819312461  - 0.003097635 *p}
 ring_chime_f_rich <- function(p){1 -0.003097635*.7*p}
@@ -135,11 +137,11 @@ set.seed(22200337)
 cr.ring.v <- sort(c(runif(4, 0, .5), runif(1, .7, 1)))
 cr.ring.v
 
-plot(df$ring_video_doorbelll, cr.ring.v, ylim = c(0,1), xlim=c(0,60))
-a <- lm(cr.ring.v ~  1 + I(df$ring_video_doorbelll))
-lines(df$ring_video_doorbelll, predict(a, I(df$ring_video_doorbelll)))
-lines(df$ring_video_doorbelll , sapply(df$ring_video_doorbelll, ring_v_rich))
-lines(df$ring_video_doorbelll, sapply(df$ring_video_doorbelll, ring_v_poor))
+plot(df$ring_v, cr.ring.v, ylim = c(0,1), xlim=c(0,60))
+a <- lm(cr.ring.v ~  1 + I(df$ring_v))
+lines(df$ring_v, predict(a, I(df$ring_v)))
+lines(df$ring_v , sapply(df$ring_v, ring_v_rich))
+lines(df$ring_v, sapply(df$ring_v, ring_v_poor))
 
 ring_v <- function(p){0.722883157  - 0.006319785 *p}
 ring_v_rich <- function(p){1 -0.006319785*.7*p}
@@ -162,4 +164,3 @@ lines(df$echo_show, sapply(df$echo_show, echo_show_poor))
 echo_show <- function(p){0.885669046  - 0.007681115 *p}
 echo_show_rich <- function(p){1 -0.007681115*.7*p}
 echo_show_poor <- function(p){0.885669046*.7 -0.007681115*1.3*p}
-

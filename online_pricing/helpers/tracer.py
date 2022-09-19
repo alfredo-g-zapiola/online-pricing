@@ -20,8 +20,7 @@ def moving_average(avg_rewards: list[float] | npt.NDArray[np.float32]) -> list[f
 
 class Tracer:
     def __init__(self, n_sims: int, n_days: int) -> None:
-        self.optimum_total: float
-
+        self.regret = list[float]()
         self.avg_reward = list[float]()
         self.arm_data = list[list[list[float]]]()
         self.rewards_mat = np.zeros(shape=(n_sims, n_days))
@@ -30,14 +29,18 @@ class Tracer:
     def add_avg_reward(self, avg_reward: float) -> None:
         self.avg_reward.append(avg_reward)
 
+    def add_regret(self, regret: float) -> None:
+        self.regret.append(regret)
+
     def set_optimum_total(self, optimum_total: float) -> None:
         self.optimum_total = optimum_total
 
     def add_arm_data(self, arm_data: list[list[float]]) -> None:
         self.arm_data.append(arm_data)
 
-    def add_daily_data(self, sample: int, rewards: list[float]) -> None:
+    def add_daily_data(self, sample: int, rewards: list[float], regrets: list[float] | None = None) -> None:
         self.rewards_mat[sample, :] = rewards
+        self.regrets_mat[sample, :] = regrets
 
     def new_day(self) -> None:
         self.avg_reward = list[float]()
@@ -102,6 +105,7 @@ class Tracer:
         sdev_rewards = self.rewards_mat.std(axis=0)
         self.plot(mean_rewards, sdev_rewards, "Mean rewards")
 
+        # Plot regret
         cum_regret = np.cumsum(self.regrets_mat, axis=1)
         mean_regrets = cum_regret.mean(axis=0)
         sdev_regret = cum_regret.std(axis=0)
