@@ -423,7 +423,7 @@ class EnvironmentBase:
         :return:
         """
         if self.context_generation:
-            computed_groups_clairvoyants = (1.416529356393042, 28.51848511013725, 4.496590722763911)
+            computed_groups_clairvoyants = (1.416529356393042, 28.51848511013725, 203.3977217166584)
 
             return sum(computed_groups_clairvoyants[g] * self.group_proportions[g] for g in range(self.n_groups))
         else:
