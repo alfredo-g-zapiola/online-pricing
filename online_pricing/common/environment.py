@@ -429,8 +429,8 @@ class EnvironmentBase:
             if not self.shifting_demand_curve:
                 return 19.08163728705  # with arm (1,1,3,1,1)
             else:
-                # best arms: (1,1,3,1,1), (1, 1, 3, 1, 1),(2, 2, 3, 1, 2)
-                computed_clairvoyants = 19.08163728705, 19.217445776609587, 8.993181445527823
+                # best arms: (2,2,3,1,2), (1, 1, 3, 1, 1),(2, 2, 3, 1, 2)
+                computed_clairvoyants = 8.993181445527823, 19.217445776609587, 8.993181445527823
                 if n_day <= 15:
                     return computed_clairvoyants[0]
                 elif n_day > 15 and n_day <= 30:
@@ -443,6 +443,8 @@ class EnvironmentBase:
         # save old value
         save = self.uncertain_demand_curve
         self.uncertain_demand_curve = False  # since we need expected value
+        save_2 = self.shifting_demand_curve
+        self.shifting_demand_curve = True
         for t in [0, 20, 35]:  # three different demand curves
             current = np.zeros(shape=(self.n_products, 4))  # 4 different ṕrices
             for p in range(self.n_products):
@@ -458,3 +460,4 @@ class EnvironmentBase:
             self.expected_demand_curve.append(current.astype(float).tolist())
 
         self.uncertain_demand_curve = save  # ripristinarlo
+        self.shifting_demand_curve = save_2
