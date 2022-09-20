@@ -101,6 +101,8 @@ class Simulator(object):
 
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
+        # TODO clairvoyant pesato
+        self.reward_tracer.add_regret(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client)
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
@@ -211,24 +213,23 @@ class Simulator(object):
             self.learners[idx].update(arms_pulled[idx], bought, features)
 
     def conversion_rate(self, product_id: int, prices: list[float], features: list[int] | None = None) -> float:
-        if not self.environment.unknown_demand_curve:
+        if self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
         else:
-            # note we have to take the average conversion rate, so we weight the c_rate of each group
-            # save old value
-            save = self.environment.uncertain_demand_curve
-            self.environment.uncertain_demand_curve = False  # since we need expected value
-            rate = sum(
-                [
-                    self.environment.sample_demand_curve(
-                        group=g, prod_id=product_id, price=prices[product_id], n_day=self.n_day
-                    )
-                    * self.environment.group_proportions[g]
-                    for g in range(self.environment.n_groups)
-                ]
-            )
-            self.environment.uncertain_demand_curve = save  # ripristinarlo
-            return rate
+            price_id = self.prices[product_id].index(prices[product_id])
+            # print("Price id is: ", price_id)
+            # print("Product id: ", product_id)
+            if self.environment.shifting_demand_curve:
+                if self.n_day <= 15:
+                    return self.environment.expected_demand_curve[0][product_id][price_id]
+                elif self.n_day > 15 and self.n_day <= 30:
+                    return self.environment.expected_demand_curve[1][product_id][price_id]
+                else:
+                    return self.environment.expected_demand_curve[2][product_id][price_id]
+
+            else:  # just take the original one
+                return self.environment.expected_demand_curve[0][product_id][price_id]
+
 
     def influence_function(self, i: int, j: int, prices: list[float], features: list[int]) -> float:
         """

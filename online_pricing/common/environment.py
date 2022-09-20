@@ -100,6 +100,8 @@ class EnvironmentBase:
         # value the objective function
         self.rewards = dict[str, float]()
         self.clairvoyant = dict[str, float]()
+        self.expected_demand_curve = list()
+        self.compute_expected_demand_curve()
 
     def get_lambda(self) -> float:
         """
@@ -325,7 +327,7 @@ class EnvironmentBase:
             seed=2200337,
         )
 
-    def compute_clairvoyant(self) -> tuple[dict[str, float], str]:
+    def compute_clairvoyant(self, n_day) -> tuple[dict[str, float], str]:
         """
         For every price combination (so it is a carthesian product of the possible prices with itself)
         , obtain the expected mean margin.
@@ -343,7 +345,8 @@ class EnvironmentBase:
         def c_rate(product: int) -> float:
             """Compute the conversion rate fixed with fixed group and prices.
             This is why the function is redefined daily"""
-            return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0])
+            return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0],
+                                            n_day=n_day)
 
         rewards = {}
         maximum = 0.0
@@ -411,12 +414,43 @@ class EnvironmentBase:
 
         return rewards, max_arm
 
-    def yield_clairvoyant(self) -> float | tuple[float | None, ...]:
+    def yield_clairvoyant(self, n_day) -> float | tuple[float | None, ...]:
         """
         Clairvoyant is hard-coded since it takes 30 mins to compute it
         :return:
         """
-        if not self.shifting_demand_curve:
-            return 19.08163728705  # with arm (1,1,3,1,1)
+        if self.context_generation:
+            pass
         else:
-            return 19.08163728705, None, None
+            if not self.shifting_demand_curve:
+                return 19.08163728705  # with arm (1,1,3,1,1)
+            else:
+                computed_clairvoyants = 19.08163728705, 15, 23
+                if n_day <= 15:
+                    return computed_clairvoyants[0]
+                elif n_day > 15 and n_day <= 30:
+                    return computed_clairvoyants[1]
+                else:
+                    return computed_clairvoyants[2]
+
+    def compute_expected_demand_curve(self):
+        # note we have to take the average conversion rate, so we weight the c_rate of each group
+        # save old value
+        save = self.uncertain_demand_curve
+        self.uncertain_demand_curve = False  # since we need expected value
+        for t in [0, 20, 35]:  # three different demand curves
+            current = np.zeros(shape=(self.n_products, 4))  # 4 different ṕrices
+            for p in range(self.n_products):
+                price_id = 0
+                for price, margin in self.prices_and_margins[self.product_id_map[p]]:
+                    current[p, price_id] = sum([self.sample_demand_curve(group=g, prod_id=p, price=price, n_day=t) *
+                                             self.group_proportions[g]
+                                          for g in range(self.n_groups)])
+                    price_id += 1
+            self.expected_demand_curve.append(current)
+
+
+        self.uncertain_demand_curve = save  # ripristinarlo
+
+
+
