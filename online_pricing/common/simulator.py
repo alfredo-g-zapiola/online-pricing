@@ -59,7 +59,7 @@ class Simulator(object):
         self.n_labeled_groups = 1
 
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
-        self.reward_tracer = tracer
+        self.tracer = tracer
         self.n_day = 0
 
     def sim_one_day(self) -> None:
@@ -99,33 +99,26 @@ class Simulator(object):
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         learner_data = self.get_learner_data()
 
-        self.reward_tracer.add_avg_reward(mean_reward_per_client)
-        self.reward_tracer.add_arm_data(learner_data)
-        self.reward_tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
-        self.reward_tracer.add_optimum_total(self.environment.yield_clairvoyant(self.n_day))
+        self.tracer.add_avg_reward(mean_reward_per_client)
+        self.tracer.add_arm_data(learner_data)
+        self.tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
+        self.tracer.add_optimum_total(self.environment.yield_clairvoyant(self.n_day))
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
             [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration[group])]
             for group in self.groups
         ]
-        self.n_day += 1
+
+        did_split = 0
         if self.environment.context_generation:
             for learner in self.learners:
-                learner.new_day()
-        #
-        # print(f"\n =========== DAY OVER {self.n_day} ===========")
-        # print("Products sold:", products_sold)
-        #
-        # print("Mean reward per client:", mean_reward_per_client)
-        # print("Next configuration:", next_day_configuration)
-        # print("Estimated edge probabilities:")
-        # print_matrix(self.estimated_edge_probas)
-        # print("Product Graph:")
-        # print_matrix(self.environment.mean_product_graph)
-        # print("Secondaries:")
-        # print_matrix(self.secondaries, indexes=True)
-        # print("\n")
+                did_split += learner.new_day() or 0
+
+            if did_split > len(self.learners):
+                self.tracer.add_split(self.n_day)
+
+        self.n_day += 1
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -145,7 +138,7 @@ class Simulator(object):
         )
         n_units = 0
         if random.random() <= buy_probability:
-            n_units = int(ceil(self.environment.sample_quantity_bought(group))) * 2
+            n_units = int(ceil(self.environment.sample_quantity_bought(group)))
             self.quantity_learners[0][0] = +n_units
             self.quantity_learners[0][0] += 1
 
@@ -350,13 +343,13 @@ class Simulator(object):
             [
                 alpha_ratios[product_id + 1]
                 * (
-                    conversion_rates[product_id] * current_margins[product_id] * mean_quantity
+                    conversion_rates[product_id] * current_margins[product_id] * self.mean_quantity_bought()
                     + sum(
                         [
                             self.influence_function(product_id, secondary_product_id, prices, features)
                             * conversion_rates[secondary_product_id]
                             * current_margins[secondary_product_id]
-                            * mean_quantity
+                            * self.mean_quantity_bought()
                             for secondary_product_id in range(self.environment.n_products)
                             if secondary_product_id != product_id
                         ]

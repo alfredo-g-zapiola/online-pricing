@@ -27,6 +27,7 @@ class Tracer:
         self.rewards_mat = np.zeros(shape=(n_sims, n_days))
         self.regrets_mat = np.zeros(shape=(n_sims, n_days))
         self.optimum_total = list[float]()
+        self.splits = list[int | None]()
 
     def add_avg_reward(self, avg_reward: float) -> None:
         self.avg_reward.append(avg_reward)
@@ -39,6 +40,9 @@ class Tracer:
 
     def add_arm_data(self, arm_data: list[list[float]]) -> None:
         self.arm_data.append(arm_data)
+
+    def add_split(self, index: int | None) -> None:
+        self.splits.append(index)
 
     def add_daily_data(self, sample: int, rewards: list[float], regrets: list[float] | None = None) -> None:
         self.rewards_mat[sample, :] = rewards
@@ -53,6 +57,9 @@ class Tracer:
     def plot_day(self) -> None:
         ma = moving_average(self.avg_reward)
         plt.figure()
+        if any(self.splits):
+            for split in self.splits:
+                plt.axvline(x=split, color="black", linestyle="--")
         plt.plot(
             self.avg_reward,
             label="Mean Average Reward",

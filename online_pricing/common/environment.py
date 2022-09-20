@@ -166,11 +166,11 @@ class EnvironmentBase:
 
         match group:
             case 0:
-                f_name = prod_name + "_poor"
+                f_name = prod_name + "_casual"
             case 1:
-                f_name = prod_name
+                f_name = prod_name + "_adjust"
             case 2:
-                f_name = prod_name + "_rich"
+                f_name = prod_name + "_organic"
             case _:
                 raise ValueError("Invalid group id")
 
@@ -247,9 +247,9 @@ class EnvironmentBase:
         """
         m: int = self.distributions_parameters["quantity_demanded_params"][group]
         if self.uncertain_quantity_bought:
-            return np.random.poisson(m)
+            return np.random.poisson(m) * 2
 
-        return m
+        return m * 2
 
     def yield_first_secondaries(self) -> list[list[int]]:
         """

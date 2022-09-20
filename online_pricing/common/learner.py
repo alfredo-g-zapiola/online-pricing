@@ -222,16 +222,19 @@ class CGLearner(Learner):
         self.training_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
         self.pre_split_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
-    def new_day(self) -> None:
+    def new_day(self) -> bool | None:
         """New day, see if context split is needed."""
         features_probability = self.features_count / np.sum(self.features_count)
         context_rewards = self.get_context_rewards()
         self.t += 1
         if self.t % self.context_window == 0:
-            self.analyze_context(features_probability, context_rewards)
+            splitted = self.analyze_context(features_probability, context_rewards)
 
             self.features_count = np.zeros(shape=(2, self.n_features), dtype=np.int64)
             self.pre_split_data = [[] for _ in range(self.n_arms)]
+
+            if splitted:
+                return splitted
 
     def get_context_rewards(self) -> list[float]:
         """Get the context rewards."""
@@ -243,14 +246,14 @@ class CGLearner(Learner):
 
         return cast(list[float], rewards)
 
-    def analyze_context(self, features_probability: Any, context_rewards: Any) -> None:
+    def analyze_context(self, features_probability: Any, context_rewards: Any) -> bool | None:
         """Make decision to split a feature or not"""
 
         for idx, feature_to_split in enumerate(self.is_split_feature):
-            if self.do_we_split(features_probability, context_rewards, feature_to_split) and not feature_to_split:
+            if self.do_we_split(features_probability, context_rewards, idx) and not feature_to_split:
                 self.is_split_feature[idx] = 1
                 self.train_learners()
-                return
+                return True
 
     def do_we_split(self, features_probability: Any, context_rewards: Any, feature_to_split: int) -> bool:
         """Check if we should split a feature."""

@@ -47,29 +47,29 @@ sample.demand = function(f,p, min.price, max.price){
 
 # the means for each product
 # P1: echo dot
-echo_dot <- function(p){0.83900346 - 0.01589725 *p}
-echo_dot_rich <- function(p){ 1 -  0.01589725*.8 *p}
-echo_dot_poor <- function(p){0.83900346*.8 - 0.01589725*1.2 *p}
+echo_dot_adjust <- function(p){0.83900346 - 0.01589725 *p}
+echo_dot_organic <- function(p){ 1 -  0.01589725*.8 *p}
+echo_dot_casual <- function(p){0.83900346*.8 - 0.01589725*1.2 *p}
 
 # P2 Ring chime
-ring_chime <- function(p){0.85502936 -0.02193963*p}
-ring_chime_rich <- function(p){1 -0.02193963*.7*p}
-ring_chime_poor <- function(p){0.85502936*.7 -0.02193963*1.3*p}
+ring_chime_adjust <- function(p){0.85502936 -0.02193963*p}
+ring_chime_organic <- function(p){1 -0.02193963*.7*p}
+ring_chime_casual <- function(p){0.85502936*.7 -0.02193963*1.3*p}
 
 # P3 Ring Floodlight Cam
-ring_f <- function(p){0.819312461  - 0.003097635 *p}
-ring_f_rich <- function(p){1 -0.003097635*.7*p}
-ring_f_poor <- function(p){0.819312461*.7 -0.003097635*1.3*p}
+ring_f_adjust <- function(p){0.819312461  - 0.003097635 *p}
+ring_f_organic <- function(p){1 -0.003097635*.7*p}
+ring_f_casual <- function(p){0.819312461*.7 -0.003097635*1.3*p}
 
 # P4 Ring video doorbell
-ring_v <- function(p){0.722883157  - 0.006319785 *p}
-ring_v_rich <- function(p){1 -0.006319785*.7*p}
-ring_v_poor <- function(p){0.722883157*.7 -0.006319785*1.3*p}
+ring_v_adjust <- function(p){0.722883157  - 0.006319785 *p}
+ring_v_organic <- function(p){1 -0.006319785*.7*p}
+ring_v_casual <- function(p){0.722883157*.7 -0.006319785*1.3*p}
 
 # P5 echo show
-echo_show <- function(p){0.885669046  - 0.007681115 *p}
-echo_show_rich <- function(p){1 -0.007681115*.7*p}
-echo_show_poor <- function(p){0.885669046*.7 -0.007681115*1.3*p}
+echo_show_adjust <- function(p){0.885669046  - 0.007681115 *p}
+echo_show_organic <- function(p){1 -0.007681115*.7*p}
+echo_show_casual <- function(p){0.885669046*.7 -0.007681115*1.3*p}
 
 # build dataframe for products' prices
 prezzi = c(1, .95, .8, .4, 0)
