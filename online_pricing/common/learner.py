@@ -184,7 +184,7 @@ class CGLearner(Learner):
         super().__init__(n_arms, prices)
         self.n_features = n_features
         self.context_window = context_window
-        self.features_count = np.zeros(shape=[2] * self.n_features, dtype=np.int64)
+        self.features_count = np.zeros(shape=(2, self.n_features), dtype=np.int64)
 
         self.learners = self.initialize_learners()
 
@@ -215,7 +215,9 @@ class CGLearner(Learner):
             arm_pulled, reward, features
         )
 
-        self.features_count[tuple(features)] += 1
+        for idx, feature in enumerate(features):
+            self.features_count[idx, feature] += 1
+
         self.training_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
         self.pre_split_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
@@ -228,15 +230,16 @@ class CGLearner(Learner):
         if self.t % self.context_window == 0:
             self.analyze_context(features_probability, context_rewards)
 
-            self.features_count = np.zeros(shape=[2] * self.n_features, dtype=np.int64)
+            self.features_count = np.zeros(shape=(2, self.n_features), dtype=np.int64)
             self.pre_split_data = [[] for _ in range(self.n_arms)]
 
     def get_context_rewards(self) -> list[float]:
         """Get the context rewards."""
-        rewards = np.zeros(shape=[2] * self.n_features)
+        rewards = np.zeros(shape=(2, self.n_features))
         for arm in range(self.n_arms):
             for reward_and_features in self.pre_split_data[arm]:
-                rewards[tuple(reward_and_features.features)] += reward_and_features.reward
+                for idx, feature in enumerate(reward_and_features.features):
+                    rewards[idx, feature] += reward_and_features.reward
 
         return cast(list[float], rewards)
 
@@ -245,6 +248,7 @@ class CGLearner(Learner):
 
         for idx, feature_to_split in enumerate(self.is_split_feature):
             if self.do_we_split(features_probability, context_rewards, feature_to_split) and not feature_to_split:
+                print("splitting")
                 self.is_split_feature[idx] = 1
                 self.train_learners()
 
@@ -255,7 +259,7 @@ class CGLearner(Learner):
         context_rewards_0 = context_rewards[feature_to_split, 0]
         context_rewards_1 = context_rewards[feature_to_split, 1]
 
-        context_reward_aggregated = self.get_aggregated_probability(feature_to_split, context_rewards)
+        context_reward_aggregated = self.get_aggregated_probability(context_rewards)
 
         return bool(probability_0 * context_rewards_0 + probability_1 * context_rewards_1 > context_reward_aggregated)
 
@@ -283,10 +287,9 @@ class CGLearner(Learner):
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
 
-    @staticmethod
-    def get_aggregated_probability(feature_to_split: int, context_rewards: Any) -> float:
+    def get_aggregated_probability(self, context_rewards: Any) -> float:
         """Get the aggregated probability of a feature."""
-        reward: float = np.mean(np.sum(context_rewards[feature_to_split])) / 2
+        reward: float = context_rewards[tuple(self.is_split_feature)]
         return reward
 
 
