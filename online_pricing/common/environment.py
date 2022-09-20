@@ -455,6 +455,6 @@ class EnvironmentBase:
                         ]
                     )
                     price_id += 1
-            self.expected_demand_curve.append(current.tolist().astype(float))
+            self.expected_demand_curve.append(current.astype(float).tolist())
 
         self.uncertain_demand_curve = save  # ripristinarlo
