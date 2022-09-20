@@ -88,7 +88,7 @@ class InfluenceFunctor:
                 # if it is secondary
                 status = assign_sec(last_edge, edge)
                 if status > 0:  # if it appears as a secondary
-                    cur_jump_proba = c_rate(last_edge) * edge_probas[last_edge][edge] * (self._lambda if status == 2 else 1)
+                    cur_jump_proba = (c_rate(last_edge) if last_edge != i else 1) * edge_probas[last_edge][edge] * (self._lambda if status == 2 else 1)
                     if edge == j:
 
                         path_proba *= cur_jump_proba

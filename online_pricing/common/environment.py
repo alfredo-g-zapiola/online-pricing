@@ -426,13 +426,13 @@ class EnvironmentBase:
         :return:
         """
         if self.context_generation:
-            pass
+            return 20.
         else:
             if not self.shifting_demand_curve:
                 return 19.08163728705  # with arm (1,1,3,1,1)
             else:
-                # best arms: (1,1,3,1,1), (1, 1, 3, 1, 1),
-                computed_clairvoyants = 19.08163728705,{ 19.217445776609587}, 23
+                # best arms: (1,1,3,1,1), (1, 1, 3, 1, 1),(2, 2, 3, 1, 2)
+                computed_clairvoyants = 19.08163728705, 19.217445776609587, 8.993181445527823
                 if n_day <= 15:
                     return computed_clairvoyants[0]
                 elif n_day > 15 and n_day <= 30:
