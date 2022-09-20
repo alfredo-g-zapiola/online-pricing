@@ -1,6 +1,6 @@
 import random
 from collections import deque, namedtuple
-from typing import Any, Deque, cast
+from typing import Any, Deque
 
 from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.influence_function import InfluenceFunctor

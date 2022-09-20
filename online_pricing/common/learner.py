@@ -3,7 +3,6 @@ from typing import Any, Type, cast
 
 import numpy as np
 
-from online_pricing.helpers.utils import sum_by_element
 from online_pricing.models.rewards_and_features import RewardsAndFeatures
 
 
@@ -232,14 +231,14 @@ class CGLearner(Learner):
             self.features_count = np.zeros(shape=[2] * self.n_features, dtype=np.int64)
             self.pre_split_data = [[] for _ in range(self.n_arms)]
 
-    def get_context_rewards(self) -> float:
+    def get_context_rewards(self) -> list[float]:
         """Get the context rewards."""
         rewards = np.zeros(shape=[2] * self.n_features)
         for arm in range(self.n_arms):
             for reward_and_features in self.pre_split_data[arm]:
                 rewards[tuple(reward_and_features.features)] += reward_and_features.reward
 
-        return rewards.astype(float)
+        return cast(list[float], rewards)
 
     def analyze_context(self, features_probability: Any, context_rewards: Any) -> None:
         """Make decision to split a feature or not"""

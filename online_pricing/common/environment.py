@@ -1,5 +1,5 @@
 import itertools
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -68,7 +68,7 @@ class EnvironmentBase:
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [700, 500, 200],  # we have more poor people than rich people
+            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
             "dirichlet_params": [  # alpha ratios
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
@@ -100,7 +100,7 @@ class EnvironmentBase:
         # value the objective function
         self.rewards = dict[str, float]()
         self.clairvoyant = dict[str, float]()
-        self.expected_demand_curve = list()
+        self.expected_demand_curve: list[list[list[float]]] = list()
         self.compute_expected_demand_curve()
 
     def get_lambda(self) -> float:
@@ -327,7 +327,7 @@ class EnvironmentBase:
             seed=2200337,
         )
 
-    def compute_clairvoyant(self, n_day) -> tuple[dict[str, float], str]:
+    def compute_clairvoyant(self, n_day: int) -> tuple[dict[str, float], str]:
         """
         For every price combination (so it is a carthesian product of the possible prices with itself)
         , obtain the expected mean margin.
@@ -338,9 +338,6 @@ class EnvironmentBase:
 
         :return: the best price combination and its clairvoyant
         """
-
-
-
 
         rewards = {}
         maximum = 0.0
@@ -364,13 +361,14 @@ class EnvironmentBase:
                 # margin changes according to today's price config
                 def price_and_margin(product: int) -> tuple[float, float]:
                     return self.prices_and_margins[self.product_id_map[product]][price_config[product]]
+
                 # conversion rate changes according to group and selected price (given by price_config)
                 def c_rate(product: int) -> float:
                     """Compute the conversion rate fixed with fixed group and prices.
                     This is why the function is redefined daily"""
-                    return self.sample_demand_curve(group=g, prod_id=product,
-                                                    price=price_and_margin(product)[0],
-                                                    n_day=n_day)
+                    return self.sample_demand_curve(
+                        group=g, prod_id=product, price=price_and_margin(product)[0], n_day=n_day
+                    )
 
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
@@ -420,13 +418,13 @@ class EnvironmentBase:
 
         return rewards, max_arm
 
-    def yield_clairvoyant(self, n_day) -> float | tuple[float | None, ...]:
+    def yield_clairvoyant(self, n_day: int) -> float:
         """
         Clairvoyant is hard-coded since it takes 30 mins to compute it
         :return:
         """
         if self.context_generation:
-            return 20.
+            return 20.0
         else:
             if not self.shifting_demand_curve:
                 return 19.08163728705  # with arm (1,1,3,1,1)
@@ -440,7 +438,7 @@ class EnvironmentBase:
                 else:
                     return computed_clairvoyants[2]
 
-    def compute_expected_demand_curve(self):
+    def compute_expected_demand_curve(self) -> None:
         # note we have to take the average conversion rate, so we weight the c_rate of each group
         # save old value
         save = self.uncertain_demand_curve
@@ -450,14 +448,13 @@ class EnvironmentBase:
             for p in range(self.n_products):
                 price_id = 0
                 for price, margin in self.prices_and_margins[self.product_id_map[p]]:
-                    current[p, price_id] = sum([self.sample_demand_curve(group=g, prod_id=p, price=price, n_day=t) *
-                                             self.group_proportions[g]
-                                          for g in range(self.n_groups)])
+                    current[p, price_id] = sum(
+                        [
+                            self.sample_demand_curve(group=g, prod_id=p, price=price, n_day=t) * self.group_proportions[g]
+                            for g in range(self.n_groups)
+                        ]
+                    )
                     price_id += 1
-            self.expected_demand_curve.append(current)
-
+            self.expected_demand_curve.append(current.tolist().astype(float))
 
         self.uncertain_demand_curve = save  # ripristinarlo
-
-
-
