@@ -147,7 +147,8 @@ class Simulator(object):
         )
         n_units = 0
         if random.random() <= buy_probability:
-            n_units = self.environment.sample_quantity_bought(group)
+            n_units = int(self.environment.sample_quantity_bought(group))
+            print("N units: ", n_units)
             self.quantity_learners[0].update(0, n_units)
 
         return n_units
@@ -312,6 +313,7 @@ class Simulator(object):
                         alpha_ratios[group],
                         group,
                     )
+                    print("Target: ", new_target)
                     # If objective value is higher, update the configuration
                     if new_target > current_target:
                         best_configuration = new_configuration

@@ -21,6 +21,9 @@ warnings.filterwarnings("ignore")
 @click.option("--no-plot", "-p", is_flag=True, help="Whether to avoid plotting the results.")
 @click.option("--n-sims", "-ns", default=30, help="How many simulations we carry out")
 @click.option("--sliding-window", "-sw", default=False, help="In step 6, whether to use UCB learners with sliding window")
+@click.option("--unknown-params", "-ukp", default=True, help="Whether some paramateres (depending on step) need to be estimated")
+@click.option("--uncertain-params", "-unp", default=False, help="Whether some params are uncertain (depending on step), i.e. we sample from "
+                                                                "them every day")
 def main(
     step: int | None,
     fully_connected: bool,
@@ -28,6 +31,8 @@ def main(
     no_plot: bool,
     n_sims: int,
     sliding_window: bool,
+    unknown_params: bool,
+        uncertain_params:bool
 ) -> None:
     if step is None:
         step = int(input("Step to be run: "))
@@ -51,8 +56,8 @@ def main(
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": False,
-                        "unknown_demand_curve": False,
+                        "uncertain_demand_curve": unknown_params,
+                        "unknown_demand_curve": uncertain_params,
                         "uncertain_quantity_bought": False,
                         "unknown_quantity_bought": False,
                         "uncertain_product_weights": False,
@@ -70,13 +75,13 @@ def main(
                         "fully_connected": fully_connected,
                         "learner_class": "TS",
                         "context_generation": False,
-                        "uncertain_alpha": True,
+                        "uncertain_alpha": uncertain_params,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": False,
-                        "unknown_demand_curve": True,
-                        "uncertain_quantity_bought": True,
-                        "unknown_quantity_bought": True,
+                        "uncertain_demand_curve": uncertain_params,
+                        "unknown_demand_curve": unknown_params,
+                        "uncertain_quantity_bought": uncertain_params,
+                        "unknown_quantity_bought": unknown_params,
                         "uncertain_product_weights": False,
                         "unknown_product_weights": False,
                     },
@@ -91,15 +96,15 @@ def main(
                         "fully_connected": fully_connected,
                         "learner_class": "TS",
                         "context_generation": False,
-                        "uncertain_alpha": False,
+                        "uncertain_alpha": uncertain_params,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": False,
-                        "unknown_demand_curve": False,
-                        "uncertain_quantity_bought": False,
-                        "unknown_quantity_bought": False,
-                        "uncertain_product_weights": True,
-                        "unknown_product_weights": True,
+                        "uncertain_demand_curve": uncertain_params,
+                        "unknown_demand_curve": unknown_params,
+                        "uncertain_quantity_bought": uncertain_params,
+                        "unknown_quantity_bought": unknown_params,
+                        "uncertain_product_weights": uncertain_params,
+                        "unknown_product_weights": unknown_params,
                     },
                 ),
             ]
@@ -111,8 +116,8 @@ def main(
                 "uncertain_alpha": False,
                 "group_unknown": True,
                 "lambda": 0.5,
-                "uncertain_demand_curve": False,
-                "unknown_demand_curve": False,
+                "uncertain_demand_curve": uncertain_params,
+                "unknown_demand_curve": True,
                 "uncertain_quantity_bought": False,
                 "unknown_quantity_bought": False,
                 "uncertain_product_weights": False,
@@ -150,8 +155,8 @@ def main(
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": False,
-                        "unknown_demand_curve": False,
+                        "uncertain_demand_curve": uncertain_params,
+                        "unknown_demand_curve": True,
                         "uncertain_quantity_bought": False,
                         "unknown_quantity_bought": False,
                         "uncertain_product_weights": False,
