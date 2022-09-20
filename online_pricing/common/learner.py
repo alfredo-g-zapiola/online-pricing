@@ -248,7 +248,6 @@ class CGLearner(Learner):
 
         for idx, feature_to_split in enumerate(self.is_split_feature):
             if self.do_we_split(features_probability, context_rewards, feature_to_split) and not feature_to_split:
-                print("splitting")
                 self.is_split_feature[idx] = 1
                 self.train_learners()
 

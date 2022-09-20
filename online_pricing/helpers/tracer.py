@@ -3,6 +3,7 @@ from typing import cast
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from scipy import interpolate
 
@@ -25,6 +26,7 @@ class Tracer:
         self.arm_data = list[list[list[float]]]()
         self.rewards_mat = np.zeros(shape=(n_sims, n_days))
         self.regrets_mat = np.zeros(shape=(n_sims, n_days))
+        self.optimum_total = list[float]()
 
     def add_avg_reward(self, avg_reward: float) -> None:
         self.avg_reward.append(avg_reward)
@@ -33,7 +35,7 @@ class Tracer:
         self.regret.append(regret)
 
     def set_optimum_total(self, optimum_total: float) -> None:
-        self.optimum_total = optimum_total
+        self.optimum_total.append(optimum_total)
 
     def add_arm_data(self, arm_data: list[list[float]]) -> None:
         self.arm_data.append(arm_data)
@@ -46,6 +48,7 @@ class Tracer:
         self.avg_reward = list[float]()
         self.arm_data = list[list[list[float]]]()
         self.regret = list[float]()
+        self.optimum_total = list[float]()
 
     def plot_day(self) -> None:
         ma = moving_average(self.avg_reward)
@@ -54,7 +57,12 @@ class Tracer:
             self.avg_reward,
             label="Mean Average Reward",
             color="blue",
-            linewidth=0.75,
+            linewidth=0.66,
+        )
+        plt.plot(
+            self.optimum_total,
+            color="black",
+            label="Optimum",
         )
         plt.plot(
             ma,

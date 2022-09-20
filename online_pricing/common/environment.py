@@ -427,7 +427,7 @@ class EnvironmentBase:
             return 20.0
         else:
             if not self.shifting_demand_curve:
-                return 19.08163728705  # with arm (1,1,3,1,1)
+                return 8.993181445527823  # with arm (1,1,3,1,1)
             else:
                 # best arms: (2,2,3,1,2), (1, 1, 3, 1, 1),(2, 2, 3, 1, 2)
                 computed_clairvoyants = 8.993181445527823, 19.217445776609587, 8.993181445527823

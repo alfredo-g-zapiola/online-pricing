@@ -21,9 +21,15 @@ warnings.filterwarnings("ignore")
 @click.option("--no-plot", "-p", is_flag=True, help="Whether to avoid plotting the results.")
 @click.option("--n-sims", "-ns", default=30, help="How many simulations we carry out")
 @click.option("--sliding-window", "-sw", default=False, help="In step 6, whether to use UCB learners with sliding window")
-@click.option("--unknown-params", "-ukp", default=True, help="Whether some paramateres (depending on step) need to be estimated")
-@click.option("--uncertain-params", "-unp", default=False, help="Whether some params are uncertain (depending on step), i.e. we sample from "
-                                                                "them every day")
+@click.option(
+    "--unknown-params", "-ukp", default=True, help="Whether some paramateres (depending on step) need to be estimated"
+)
+@click.option(
+    "--uncertain-params",
+    "-unp",
+    default=False,
+    help="Whether some params are uncertain (depending on step), i.e. we sample from " "them every day",
+)
 def main(
     step: int | None,
     fully_connected: bool,
@@ -32,7 +38,7 @@ def main(
     n_sims: int,
     sliding_window: bool,
     unknown_params: bool,
-        uncertain_params:bool
+    uncertain_params: bool,
 ) -> None:
     if step is None:
         step = int(input("Step to be run: "))
@@ -56,8 +62,8 @@ def main(
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": unknown_params,
-                        "unknown_demand_curve": uncertain_params,
+                        "uncertain_demand_curve": uncertain_params,
+                        "unknown_demand_curve": unknown_params,
                         "uncertain_quantity_bought": False,
                         "unknown_quantity_bought": False,
                         "uncertain_product_weights": False,
@@ -185,10 +191,6 @@ def main(
 
             run_simulator(n_sims, n_days, environment, tracer, learner_factory)
 
-            if not no_plot:
-                tracer.plot_day()
-                tracer.plot_total()
-
     except KeyboardInterrupt:
         print()
         print()
@@ -201,6 +203,10 @@ def main(
         print(" !==============================! End of Simulation !==============================! ")
         print()
         print()
+
+        if not no_plot:
+            tracer.plot_day()
+            tracer.plot_total()
 
 
 def run_simulator(

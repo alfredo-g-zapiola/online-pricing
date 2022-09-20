@@ -7,7 +7,7 @@ from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import int_to_features, print_matrix, sum_by_element
+from online_pricing.helpers.utils import int_to_features, mean, print_matrix, sum_by_element
 from online_pricing.models.user import User
 
 
@@ -149,7 +149,6 @@ class Simulator(object):
         n_units = 0
         if random.random() <= buy_probability:
             n_units = int(self.environment.sample_quantity_bought(group))
-            print("N units: ", n_units)
             self.quantity_learners[0].update(0, n_units)
 
         return n_units
@@ -236,8 +235,6 @@ class Simulator(object):
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
         else:
             price_id = self.prices[product_id].index(prices[product_id])
-            # print("Price id is: ", price_id)
-            # print("Product id: ", product_id)
             if self.environment.shifting_demand_curve:
                 if self.n_day <= 15:
                     return self.environment.expected_demand_curve[0][product_id][price_id]
@@ -314,7 +311,6 @@ class Simulator(object):
                         alpha_ratios[group],
                         group,
                     )
-                    print("Target: ", new_target)
                     # If objective value is higher, update the configuration
                     if new_target > current_target:
                         best_configuration = new_configuration
@@ -393,4 +389,10 @@ class Simulator(object):
 
         :return: list of list of data.
         """
-        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
+        return [
+            [
+                mean([learner.sample_arm(price, int_to_features(group)) for group in self.groups])
+                for price in range(self.environment.n_prices)
+            ]
+            for learner in self.learners
+        ]
