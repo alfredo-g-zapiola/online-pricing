@@ -54,7 +54,7 @@ class Simulator(object):
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required
         self.estimated_edge_probas: list[list[float]]
-        self.quantity_learners = [[0,0]]
+        self.quantity_learners = [[0,1]]
         self.n_labeled_groups = 1
 
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)

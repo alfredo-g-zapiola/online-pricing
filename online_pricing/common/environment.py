@@ -423,13 +423,13 @@ class EnvironmentBase:
         :return:
         """
         if self.context_generation:
-            computed_groups_clairvoyants = (8.993181445527823, 13.29717560887341, 4.496590722763911)
+            computed_groups_clairvoyants = (1.416529356393042, 28.51848511013725, 4.496590722763911)
 
             return sum(computed_groups_clairvoyants[g] * self.group_proportions[g] for g in range(self.n_groups))
         else:
             # best arms: (2, 1, 3, 1, 2), (2, 2, 3, 1, 2),(2, 2, 3, 1, 2)
-            computed_clairvoyants = (38.88575186024893, 69.22598107253785)
-            computed_clairvoyants = (8.993181445527823, 13.29717560887341, 4.496590722763911)
+            computed_clairvoyants = (38.88575186024893, 69.22598107253785, 16.13083207278911)
+            # computed_clairvoyants = (8.993181445527823, 13.29717560887341, 16.13083207278911)
             if not self.shifting_demand_curve:
                 return computed_clairvoyants[0]  # with arm (1,1,3,1,1)
             else:

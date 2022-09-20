@@ -32,7 +32,7 @@ def main(
     n_sims: int,
     sliding_window: bool,
     unknown_params: bool,
-        uncertain_params:bool
+    uncertain_params:bool
 ) -> None:
     if step is None:
         step = int(input("Step to be run: "))
