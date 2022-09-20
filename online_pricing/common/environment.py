@@ -68,7 +68,7 @@ class EnvironmentBase:
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
+            "n_people_params": [300, 450, 700],  # we have more poor people than rich people
             "dirichlet_params": [  # alpha ratios
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
@@ -247,7 +247,7 @@ class EnvironmentBase:
         """
         m: int = self.distributions_parameters["quantity_demanded_params"][group]
         if self.uncertain_quantity_bought:
-            return (np.random.poisson(m))
+            return np.random.poisson(m)
 
         return m
 
@@ -355,7 +355,7 @@ class EnvironmentBase:
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
             print("Price config: ", price_config)
-            cur_reward = 0.
+            cur_reward = 0.0
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
@@ -372,6 +372,7 @@ class EnvironmentBase:
                     return self.sample_demand_curve(
                         group=g, prod_id=product, price=price_and_margin(product)[0], n_day=n_day
                     )
+
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
                     for p2 in [i for i in range(self.n_products) if i != p1]:
@@ -399,9 +400,8 @@ class EnvironmentBase:
                     ]
                 )
                 # weight it according to number of people
-               # print(g_reward)
+                # print(g_reward)
                 cur_reward += g_reward * self.group_proportions[g]
-
 
             rewards[str(price_config)] = cur_reward
             if cur_reward > maximum:
@@ -433,7 +433,6 @@ class EnvironmentBase:
             if not self.shifting_demand_curve:
                 return computed_clairvoyants[0]  # with arm (1,1,3,1,1)
             else:
-
 
                 if n_day <= 15:
                     return computed_clairvoyants[0]

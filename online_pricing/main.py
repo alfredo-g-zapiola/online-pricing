@@ -192,6 +192,7 @@ def main(
             run_simulator(n_sims, n_days, environment, tracer, learner_factory)
 
             if not no_plot:
+                no_plot = True
                 tracer.plot_day()
                 tracer.plot_total()
 
@@ -218,7 +219,7 @@ def run_simulator(
 ) -> None:
     for n in range(n_samples):
         simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
-        for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}", disable=True):
+        for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
             simulator.sim_one_day()
         tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n)
 

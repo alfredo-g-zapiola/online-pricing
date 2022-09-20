@@ -1,5 +1,6 @@
 import random
 from collections import deque, namedtuple
+from math import ceil
 from typing import Any, Deque
 
 from online_pricing.common.environment import EnvironmentBase
@@ -92,10 +93,7 @@ class Simulator(object):
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         current_margins = [
-            [
-                self.margins[product_id][self.prices[product_id].index(idx)]
-                for product_id, idx in enumerate(self.current_prices[group])
-            ]
+            [self.margins[idx][self.prices[idx].index(price)] for idx, price in enumerate(self.current_prices[group])]
             for group in self.groups
         ]
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
@@ -104,6 +102,7 @@ class Simulator(object):
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
         self.reward_tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
+        self.reward_tracer.add_optimum_total(self.environment.yield_clairvoyant(self.n_day))
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
@@ -114,20 +113,19 @@ class Simulator(object):
         if self.environment.context_generation:
             for learner in self.learners:
                 learner.new_day()
-
-        print("\n =========== DAY OVER ===========")
-        print("Products sold:", products_sold)
-        print("Current prices:", self.current_prices)
-        print("Current margins:", current_margins)
-        print("Mean reward per client:", mean_reward_per_client)
-        print("Next configuration:", next_day_configuration)
-        print("Estimated edge probabilities:")
-        print_matrix(self.estimated_edge_probas)
-        print("Product Graph:")
-        print_matrix(self.environment.mean_product_graph)
-        print("Secondaries:")
-        print_matrix(self.secondaries, indexes=True)
-        print("\n")
+        #
+        # print(f"\n =========== DAY OVER {self.n_day} ===========")
+        # print("Products sold:", products_sold)
+        #
+        # print("Mean reward per client:", mean_reward_per_client)
+        # print("Next configuration:", next_day_configuration)
+        # print("Estimated edge probabilities:")
+        # print_matrix(self.estimated_edge_probas)
+        # print("Product Graph:")
+        # print_matrix(self.environment.mean_product_graph)
+        # print("Secondaries:")
+        # print_matrix(self.secondaries, indexes=True)
+        # print("\n")
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -147,7 +145,7 @@ class Simulator(object):
         )
         n_units = 0
         if random.random() <= buy_probability:
-            n_units = int(self.environment.sample_quantity_bought(group))
+            n_units = int(ceil(self.environment.sample_quantity_bought(group))) * 2
             self.quantity_learners[0][0] = +n_units
             self.quantity_learners[0][0] += 1
 
@@ -296,7 +294,6 @@ class Simulator(object):
             current_target = self.objective_function(
                 [self.prices[product_id][0] for product_id in products], alpha_ratios[group], group
             )
-
             has_changed = True
             best_configuration = [0] * self.environment.n_products
             while has_changed:
@@ -331,7 +328,7 @@ class Simulator(object):
         if group is None:
             group = 0
 
-        features = int_to_features(group)
+        features = int_to_features(group + 1)
 
         current_margins = [
             self.margins[product_id][self.prices[product_id].index(idx)] for product_id, idx in enumerate(prices)
@@ -348,17 +345,18 @@ class Simulator(object):
 
             conversion_rates = [c_rate(product_id) for product_id in range(self.environment.n_products)]
 
+        mean_quantity = self.environment.distributions_parameters["quantity_demanded_params"][group]
         return sum(
             [
                 alpha_ratios[product_id + 1]
                 * (
-                    conversion_rates[product_id] * current_margins[product_id] * self.mean_quantity_bought()
+                    conversion_rates[product_id] * current_margins[product_id] * mean_quantity
                     + sum(
                         [
                             self.influence_function(product_id, secondary_product_id, prices, features)
                             * conversion_rates[secondary_product_id]
                             * current_margins[secondary_product_id]
-                            * self.mean_quantity_bought()
+                            * mean_quantity
                             for secondary_product_id in range(self.environment.n_products)
                             if secondary_product_id != product_id
                         ]
@@ -397,7 +395,7 @@ class Simulator(object):
         """
         return [
             [
-                mean([learner.sample_arm(price, int_to_features(group)) for group in self.groups])
+                mean([learner.sample_arm(price, int_to_features(group + 1)) for group in self.groups])
                 for price in range(self.environment.n_prices)
             ]
             for learner in self.learners

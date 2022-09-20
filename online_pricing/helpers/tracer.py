@@ -9,7 +9,7 @@ from scipy import interpolate
 
 
 def moving_average(avg_rewards: list[float] | npt.NDArray[np.float32]) -> list[float]:
-    window = 7
+    window = 5
     average = []
     for idx in range(len(avg_rewards) - window + 1):
         average.append(np.mean(avg_rewards[idx : idx + window]))
@@ -34,7 +34,7 @@ class Tracer:
     def add_regret(self, regret: float) -> None:
         self.regret.append(regret)
 
-    def set_optimum_total(self, optimum_total: float) -> None:
+    def add_optimum_total(self, optimum_total: float) -> None:
         self.optimum_total.append(optimum_total)
 
     def add_arm_data(self, arm_data: list[list[float]]) -> None:

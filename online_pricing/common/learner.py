@@ -195,10 +195,10 @@ class CGLearner(Learner):
 
     def initialize_learners(self) -> Any:
         """Initialize learners."""
-        learners = np.full(shape=[2] * self.n_features, fill_value=None, dtype=UCBLearner)
+        learners = np.ndarray(shape=[2] * self.n_features, dtype=TSLearner)
         initialize_learners = learners.flatten()
         for idx in range(len(initialize_learners)):
-            initialize_learners[idx] = UCBLearner(self.n_arms, self.prices)
+            initialize_learners[idx] = TSLearner(self.n_arms, self.prices)
         return initialize_learners.reshape(learners.shape)
 
     def update(self, arm_pulled: int, reward: int, *args: Any) -> None:
@@ -250,6 +250,7 @@ class CGLearner(Learner):
             if self.do_we_split(features_probability, context_rewards, feature_to_split) and not feature_to_split:
                 self.is_split_feature[idx] = 1
                 self.train_learners()
+                return
 
     def do_we_split(self, features_probability: Any, context_rewards: Any, feature_to_split: int) -> bool:
         """Check if we should split a feature."""
@@ -282,6 +283,17 @@ class CGLearner(Learner):
         arm_sampled = self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].sample_arm(
             arm_id
         )
+        return cast(float, arm_sampled)
+
+    def mean_arm(self, arm_id: int, *args: Any) -> float:
+        """
+        Sample an arm.
+
+        The choice of which learner to pull is based on split features. If a feature is not split, it's considered
+        aggregated, so the learner chosen the aggregated learner of that feature.
+        """
+        features: list[int] = args[0]
+        arm_sampled = self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].mean_arm(arm_id)
         return cast(float, arm_sampled)
 
     def get_arm(self, price: float) -> int:
