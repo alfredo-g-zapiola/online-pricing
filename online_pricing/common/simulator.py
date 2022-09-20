@@ -7,7 +7,7 @@ from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import int_to_features, mean, print_matrix, sum_by_element
+from online_pricing.helpers.utils import int_to_features, print_matrix, sum_by_element
 from online_pricing.models.user import User
 
 
@@ -54,7 +54,7 @@ class Simulator(object):
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required
         self.estimated_edge_probas: list[list[float]]
-        self.quantity_learners = [TSLearner(1, [0])]
+        self.quantity_learners = [[0,0]]
         self.n_labeled_groups = 1
 
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
@@ -104,7 +104,6 @@ class Simulator(object):
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
         self.reward_tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
-        self.reward_tracer.set_optimum_total(self.environment.yield_clairvoyant(self.n_day))
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
@@ -149,7 +148,9 @@ class Simulator(object):
         n_units = 0
         if random.random() <= buy_probability:
             n_units = int(self.environment.sample_quantity_bought(group))
-            self.quantity_learners[0].update(0, n_units)
+            self.quantity_learners[0][0] =+ n_units
+            self.quantity_learners[0][0] += 1
+
 
         return n_units
 
@@ -234,7 +235,10 @@ class Simulator(object):
         if self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
         else:
-            price_id = self.prices[product_id].index(prices[product_id])
+            # price_id = self.prices[product_id].index(prices[product_id])
+            # print("Price id is: ", price_id)
+            # print("Product id: ", product_id)
+            price_id = self.learners[product_id].get_arm(prices[product_id])
             if self.environment.shifting_demand_curve:
                 if self.n_day <= 15:
                     return self.environment.expected_demand_curve[0][product_id][price_id]
@@ -263,7 +267,7 @@ class Simulator(object):
 
     def mean_quantity_bought(self) -> float:
         if self.environment.unknown_quantity_bought:
-            return self.quantity_learners[0].sample_arm(0)
+            return self.quantity_learners[0][0] / self.quantity_learners[0][1]
         else:
             return sum(
                 [
@@ -389,10 +393,4 @@ class Simulator(object):
 
         :return: list of list of data.
         """
-        return [
-            [
-                mean([learner.sample_arm(price, int_to_features(group)) for group in self.groups])
-                for price in range(self.environment.n_prices)
-            ]
-            for learner in self.learners
-        ]
+        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]

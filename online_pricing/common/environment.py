@@ -247,7 +247,7 @@ class EnvironmentBase:
         """
         m: int = self.distributions_parameters["quantity_demanded_params"][group]
         if self.uncertain_quantity_bought:
-            return int(np.random.poisson(m))
+            return (np.random.poisson(m))
 
         return m
 
@@ -344,6 +344,8 @@ class EnvironmentBase:
         cur_reward = 0.0
         max_arm = ""
 
+        save_shift = self.shifting_demand_curve
+        self.shifting_demand_curve = True
         uncertain_config = self.uncertain_demand_curve  # save config
         self.uncertain_demand_curve = False  # so we take the mean value
         alpha_context_config = self.context_generation
@@ -353,6 +355,7 @@ class EnvironmentBase:
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
             print("Price config: ", price_config)
+            cur_reward = 0.
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
@@ -369,7 +372,6 @@ class EnvironmentBase:
                     return self.sample_demand_curve(
                         group=g, prod_id=product, price=price_and_margin(product)[0], n_day=n_day
                     )
-
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
                     for p2 in [i for i in range(self.n_products) if i != p1]:
@@ -396,13 +398,10 @@ class EnvironmentBase:
                         for product_id in range(self.n_products)
                     ]
                 )
+                # weight it according to number of people
+               # print(g_reward)
+                cur_reward += g_reward * self.group_proportions[g]
 
-                cur_reward += (
-                    g_reward * self.distributions_parameters["n_people_params"][g]
-                )  # weight it according to number of people
-            cur_reward /= sum(
-                [self.distributions_parameters["n_people_params"][g] for g in range(self.n_groups)]
-            )  # normalise
 
             rewards[str(price_config)] = cur_reward
             if cur_reward > maximum:
@@ -415,7 +414,7 @@ class EnvironmentBase:
 
         self.rewards = rewards
         self.clairvoyant = {max_arm: maximum}
-
+        self.shifting_demand_curve = save_shift
         return rewards, max_arm
 
     def yield_clairvoyant(self, n_day: int) -> float:
@@ -424,13 +423,18 @@ class EnvironmentBase:
         :return:
         """
         if self.context_generation:
-            return 20.0
+            computed_groups_clairvoyants = (8.993181445527823, 13.29717560887341, 4.496590722763911)
+
+            return sum(computed_groups_clairvoyants[g] * self.group_proportions[g] for g in range(self.n_groups))
         else:
+            # best arms: (2, 1, 3, 1, 2), (2, 2, 3, 1, 2),(2, 2, 3, 1, 2)
+            computed_clairvoyants = (38.88575186024893, 69.22598107253785)
+            computed_clairvoyants = (8.993181445527823, 13.29717560887341, 4.496590722763911)
             if not self.shifting_demand_curve:
-                return 8.993181445527823  # with arm (1,1,3,1,1)
+                return computed_clairvoyants[0]  # with arm (1,1,3,1,1)
             else:
-                # best arms: (2,2,3,1,2), (1, 1, 3, 1, 1),(2, 2, 3, 1, 2)
-                computed_clairvoyants = 8.993181445527823, 19.217445776609587, 8.993181445527823
+
+
                 if n_day <= 15:
                     return computed_clairvoyants[0]
                 elif n_day > 15 and n_day <= 30:
