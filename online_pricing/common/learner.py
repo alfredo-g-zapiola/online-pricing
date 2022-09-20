@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Type, cast
 
@@ -225,7 +226,6 @@ class CGLearner(Learner):
         """New day, see if context split is needed."""
         features_probability = self.features_count / np.sum(self.features_count)
         context_rewards = self.get_context_rewards()
-
         self.t += 1
         if self.t % self.context_window == 0:
             self.analyze_context(features_probability, context_rewards)
@@ -268,6 +268,7 @@ class CGLearner(Learner):
         for arm, episode in enumerate(self.training_data):
             for reward_and_features in episode:
                 reward, features = reward_and_features.reward, reward_and_features.features
+
                 self.learners[tuple(np.logical_and(features, self.is_split_feature).astype(np.int8))].update(arm, reward)
 
     def sample_arm(self, arm_id: int, *args: Any) -> float:

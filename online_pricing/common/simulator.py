@@ -7,7 +7,7 @@ from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import int_to_features, print_matrix, sum_by_element
+from online_pricing.helpers.utils import int_to_features, mean, print_matrix, sum_by_element
 from online_pricing.models.user import User
 
 
@@ -54,7 +54,7 @@ class Simulator(object):
         # estimate the matrix A (present in environment but not known)
         # this is later updated, initialisation not required
         self.estimated_edge_probas: list[list[float]]
-        self.quantity_learners = [[0,1]]
+        self.quantity_learners = [[0, 1]]
         self.n_labeled_groups = 1
 
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
@@ -148,9 +148,8 @@ class Simulator(object):
         n_units = 0
         if random.random() <= buy_probability:
             n_units = int(self.environment.sample_quantity_bought(group))
-            self.quantity_learners[0][0] =+ n_units
+            self.quantity_learners[0][0] = +n_units
             self.quantity_learners[0][0] += 1
-
 
         return n_units
 
@@ -297,6 +296,7 @@ class Simulator(object):
             current_target = self.objective_function(
                 [self.prices[product_id][0] for product_id in products], alpha_ratios[group], group
             )
+
             has_changed = True
             best_configuration = [0] * self.environment.n_products
             while has_changed:
@@ -315,14 +315,16 @@ class Simulator(object):
                         alpha_ratios[group],
                         group,
                     )
+
                     # If objective value is higher, update the configuration
                     if new_target > current_target:
                         best_configuration = new_configuration
                         current_target = new_target
                         has_changed = True
-
             best_configurations.append(best_configuration)
 
+        if not self.environment.context_generation:
+            return [best_configurations[0] for _ in self.groups]
         return best_configurations
 
     def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
@@ -393,4 +395,10 @@ class Simulator(object):
 
         :return: list of list of data.
         """
-        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
+        return [
+            [
+                mean([learner.sample_arm(price, int_to_features(group)) for group in self.groups])
+                for price in range(self.environment.n_prices)
+            ]
+            for learner in self.learners
+        ]
