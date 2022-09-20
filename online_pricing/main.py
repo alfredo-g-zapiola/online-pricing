@@ -29,14 +29,14 @@ def main(
     n_sims: int,
     sliding_window: bool,
 ) -> None:
+    if step is None:
+        step = int(input("Step to be run: "))
+
     print()
     print()
     print(" !==============================! Simulation Starting !==============================! ")
     print()
     print()
-
-    if step is None:
-        step = int(input("Step to be run: "))
 
     match step:
         case 3:
@@ -203,7 +203,7 @@ def run_simulator(
 ) -> None:
     for n in range(n_samples):
         simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
-        for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
+        for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}", disable=True):
             simulator.sim_one_day()
         tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n)
 

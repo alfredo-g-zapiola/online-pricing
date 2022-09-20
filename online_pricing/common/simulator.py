@@ -7,7 +7,7 @@ from online_pricing.common.influence_function import InfluenceFunctor
 from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import int_to_features, mean, sum_by_element
+from online_pricing.helpers.utils import int_to_features, print_matrix, sum_by_element
 from online_pricing.models.user import User
 
 
@@ -43,7 +43,6 @@ class Simulator(object):
         self.current_prices = [[self.prices[idx][0] for idx in range(self.environment.n_products)] for _ in self.groups]
 
         # Learners #
-
         self.learners = list[Learner]()
         for idx in range(self.environment.n_products):
             learner_factory.base_args = (self.environment.n_prices, self.prices[idx])
@@ -89,8 +88,7 @@ class Simulator(object):
 
             self.update_learners(buys=buys, prices=self.current_prices[group], features=[client.feature_0, client.feature_1])
             self.social_influence.add_episode(influenced_episodes)
-        # Estimate probabilities
-        # Regret calculator
+
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         current_margins = [
@@ -116,6 +114,20 @@ class Simulator(object):
         if self.environment.context_generation:
             for learner in self.learners:
                 learner.new_day()
+
+        print("\n =========== DAY OVER ===========")
+        print("Products sold:", products_sold)
+        print("Current prices:", self.current_prices)
+        print("Current margins:", current_margins)
+        print("Mean reward per client:", mean_reward_per_client)
+        print("Next configuration:", next_day_configuration)
+        print("Estimated edge probabilities:")
+        print_matrix(self.estimated_edge_probas)
+        print("Product Graph:")
+        print_matrix(self.environment.mean_product_graph)
+        print("Secondaries:")
+        print_matrix(self.secondaries, indexes=True)
+        print("\n")
 
     def sim_buy(self, group: int, product_id: int, price: float) -> int:
         """
@@ -275,17 +287,15 @@ class Simulator(object):
         """
         products = range(self.environment.n_products)
         n_prices = len(self.prices[0])
-        best_configuration = [0] * self.environment.n_products
         best_configurations = list[list[int]]()
-
         alpha_ratios = self.expected_alpha_r
-        current_target = [
-            self.objective_function([self.prices[product_id][0] for product_id in products], alpha_ratios[group], group)
-            for group in self.groups
-        ]
 
-        has_changed = True
         for group in self.groups:
+            current_target = self.objective_function(
+                [self.prices[product_id][0] for product_id in products], alpha_ratios[group], group
+            )
+            has_changed = True
+            best_configuration = [0] * self.environment.n_products
             while has_changed:
                 has_changed = False
                 for price_to_increase in products:
@@ -302,11 +312,10 @@ class Simulator(object):
                         alpha_ratios[group],
                         group,
                     )
-
                     # If objective value is higher, update the configuration
-                    if new_target > current_target[group]:
+                    if new_target > current_target:
                         best_configuration = new_configuration
-                        current_target[group] = new_target
+                        current_target = new_target
                         has_changed = True
 
             best_configurations.append(best_configuration)
@@ -381,12 +390,4 @@ class Simulator(object):
 
         :return: list of list of data.
         """
-        # TODO see if these implementation makes sense, namely the mean of the groups
-        features = [int_to_features(group) for group in self.groups]
-        return [
-            [
-                mean([learner.sample_arm(price, feature) for feature in features])
-                for price in range(self.environment.n_prices)
-            ]
-            for learner in self.learners
-        ]
+        return [[learner.sample_arm(price) for price in range(self.environment.n_prices)] for learner in self.learners]
