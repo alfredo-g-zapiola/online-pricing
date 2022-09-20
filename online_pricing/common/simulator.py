@@ -104,6 +104,7 @@ class Simulator(object):
         self.reward_tracer.add_avg_reward(mean_reward_per_client)
         self.reward_tracer.add_arm_data(learner_data)
         self.reward_tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
+        self.reward_tracer.set_optimum_total(self.environment.yield_clairvoyant(self.n_day))
 
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
