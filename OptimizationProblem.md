@@ -3,7 +3,7 @@
 
 ### The problem formulation is:
 
-<img src="https://latex.codecogs.com/svg.image?&space;&space;&space;&space;\max_{\underline{x}&space;\in&space;\mathcal{P}}&space;\sum_{g=1}^{3}&space;\sum_{p&space;\in&space;P}\alpha_{gp}&space;(c_{gp}(x_p)*m_p(x_p)*Q_g)&space;&plus;&space;\sum_{\tilde{p}&space;\in&space;P&space;:&space;\tilde{p}&space;\neq&space;p&space;}&space;\tilde{i}_{p\tilde{p}}(x_{\tilde{p}})&space;*&space;c_{g\tilde{p}}(x_p)*&space;m_{\tilde{p}}(x_{\tilde{p}})*Q_g&space;&space;">    
+<img src="https://latex.codecogs.com/svg.image?&space;&space;&space;&space;\max_{\underline{x}&space;\in&space;\mathcal{P}}&space;\sum_{g=1}^{3}&space;\sum_{p&space;\in&space;P}\alpha_{gp}&space;(c_{gp}(x_p)*m_p(x_p)*Q_g&space;&plus;&space;\sum_{\tilde{p}&space;\in&space;P&space;:&space;\tilde{p}&space;\neq&space;p&space;}&space;\tilde{i}_{p\tilde{p}}(x_{\tilde{p}})&space;*&space;c_{g\tilde{p}}(x_p)*&space;m_{\tilde{p}}(x_{\tilde{p}})*Q_g)&space;&space;">    
 
 
 - __x__ is the vector of the price for each product
