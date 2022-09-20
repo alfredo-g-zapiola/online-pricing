@@ -196,6 +196,8 @@ def run_simulator(
                 tracer.new_day()
 
     except KeyboardInterrupt:
+        print()
+        print()
         print(" !==============================! Interrupted !==============================! ")
 
 

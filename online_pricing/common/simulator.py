@@ -23,7 +23,7 @@ class Simulator(object):
         """
         # Base parameters #
         self.seed = seed  # TODO: use this
-        self.groups = range(3)
+        self.groups = range(environment.n_groups)
         self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
         self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
@@ -40,7 +40,7 @@ class Simulator(object):
             for prices_and_margins in self.environment.prices_and_margins.values()
         ]
         # start with the lowest prices
-        self.current_prices = [self.prices[idx][0] for idx in range(self.environment.n_products)]
+        self.current_prices = [[self.prices[idx][0] for idx in range(self.environment.n_products)] for _ in self.groups]
 
         # Learners #
 
@@ -74,27 +74,31 @@ class Simulator(object):
         along with the empirical influence matrix that records the jumps to secondary products.
         """
         direct_clients = self.environment.get_direct_clients()
-        products_sold: list[int] = [0] * self.environment.n_products
+        products_sold: list[list[int]] = [[0] * self.environment.n_products] * self.environment.n_groups
         n_users = 0
 
         for client in direct_clients:
             n_users += 1
+            group = client.group
             buys, influenced_episodes = self.sim_one_user(
                 client=client,
                 product_graph=self.environment.distributions_parameters["product_graph"][client.group].sample(),
-                prices=self.current_prices,
+                prices=self.current_prices[group],
             )
-            products_sold = sum_by_element(products_sold, buys)
+            products_sold[group] = sum_by_element(products_sold[group], buys)
 
-            self.update_learners(buys=buys, prices=self.current_prices, features=[client.feature_0, client.feature_1])
+            self.update_learners(buys=buys, prices=self.current_prices[group], features=[client.feature_0, client.feature_1])
             self.social_influence.add_episode(influenced_episodes)
         # Estimate probabilities
         # Regret calculator
         self.estimated_edge_probas = self.social_influence.estimate_probabilities()
 
         current_margins = [
-            self.margins[product_id][self.prices[product_id].index(idx)]
-            for product_id, idx in enumerate(self.current_prices)
+            [
+                self.margins[product_id][self.prices[product_id].index(idx)]
+                for product_id, idx in enumerate(self.current_prices[group])
+            ]
+            for group in self.groups
         ]
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         learner_data = self.get_learner_data()
@@ -104,8 +108,10 @@ class Simulator(object):
         self.reward_tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
 
         next_day_configuration = self.greedy_algorithm()
-        self.current_prices = [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration)]
-
+        self.current_prices = [
+            [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration[group])]
+            for group in self.groups
+        ]
         self.n_day += 1
         if self.environment.context_generation:
             for learner in self.learners:
@@ -229,7 +235,6 @@ class Simulator(object):
             else:  # just take the original one
                 return self.environment.expected_demand_curve[0][product_id][price_id]
 
-
     def influence_function(self, i: int, j: int, prices: list[float], features: list[int]) -> float:
         """
         Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
@@ -253,11 +258,11 @@ class Simulator(object):
                 [
                     self.environment.distributions_parameters["quantity_demanded_params"][g]
                     * self.environment.group_proportions[g]
-                    for g in range(self.environment.n_groups)
+                    for g in self.groups
                 ]
             )
 
-    def greedy_algorithm(self) -> list[int]:
+    def greedy_algorithm(self) -> list[list[int]]:
         """
         Greedy algorithm to select next day configuration of prices.
 
@@ -271,11 +276,16 @@ class Simulator(object):
         products = range(self.environment.n_products)
         n_prices = len(self.prices[0])
         best_configuration = [0] * self.environment.n_products
+        best_configurations = list[list[int]]()
 
-        if not self.environment.context_generation:
-            alpha_ratios = cast(list[float], self.expected_alpha_r)
-            current_target = self.objective_function([self.prices[product_id][0] for product_id in products], alpha_ratios)
-            has_changed = True
+        alpha_ratios = self.expected_alpha_r
+        current_target = [
+            self.objective_function([self.prices[product_id][0] for product_id in products], alpha_ratios[group], group)
+            for group in self.groups
+        ]
+
+        has_changed = True
+        for group in self.groups:
             while has_changed:
                 has_changed = False
                 for price_to_increase in products:
@@ -288,57 +298,22 @@ class Simulator(object):
                     new_configuration[price_to_increase] += 1
 
                     new_target = self.objective_function(
-                        [self.prices[product_id][new_configuration[product_id]] for product_id in products], alpha_ratios
+                        [self.prices[product_id][new_configuration[product_id]] for product_id in products],
+                        alpha_ratios[group],
+                        group,
                     )
+
                     # If objective value is higher, update the configuration
-                    if new_target > current_target:
+                    if new_target > current_target[group]:
                         best_configuration = new_configuration
-                        current_target = new_target
+                        current_target[group] = new_target
                         has_changed = True
 
-        else:
-            alpha_ratios_groups = cast(list[list[float]], self.expected_alpha_r)
-            current_target = mean(
-                [
-                    self.objective_function(
-                        [self.prices[product_id][0] for product_id in products], alpha_ratios_groups[group], group
-                    )
-                    for group in range(self.environment.n_groups)
-                ]
-            )
-            has_changed = True
-            while has_changed:
-                has_changed = False
-                for price_to_increase in products:
+            best_configurations.append(best_configuration)
 
-                    new_configuration = best_configuration.copy()
-                    # While checking that the index doesn't exceed the number of prices available
-                    if new_configuration[price_to_increase] >= n_prices - 1:
-                        continue
-                    # Increase the price
-                    new_configuration[price_to_increase] += 1
-
-                    # TODO media pesata
-                    new_target = mean(
-                        [
-                            self.objective_function(
-                                [self.prices[product_id][new_configuration[product_id]] for product_id in products],
-                                alpha_ratios_groups[group],
-                                group,
-                            )
-                            for group in range(self.environment.n_groups)
-                        ]
-                    )
-                    # If objective value is higher, update the configuration
-                    if new_target > current_target:
-                        best_configuration = new_configuration
-                        current_target = new_target
-                        has_changed = True
-
-        return best_configuration
+        return best_configurations
 
     def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
-
         if group is None:
             group = 0
 
@@ -379,7 +354,7 @@ class Simulator(object):
             ]
         )
 
-    def get_reward(self, n_user: int, products_sold: list[int], margins: list[float]) -> float:
+    def get_reward(self, n_user: int, products_sold: list[list[int]], margins: list[list[float]]) -> float:
         """
         Get the reward for a given user, given the products sold and the margins.
 
@@ -388,7 +363,17 @@ class Simulator(object):
         :param margins: list of margins.
         :return: reward for the user.
         """
-        return sum([margins[i] * products_sold[i] for i in range(self.environment.n_products)]) / n_user if n_user > 0 else 0
+        return (
+            sum(
+                [
+                    sum([margins[group][i] * products_sold[group][i] for i in range(self.environment.n_products)])
+                    for group in self.groups
+                ]
+            )
+            / n_user
+            if n_user > 0
+            else 0
+        )
 
     def get_learner_data(self) -> list[list[float]]:
         """
@@ -397,7 +382,7 @@ class Simulator(object):
         :return: list of list of data.
         """
         # TODO see if these implementation makes sense, namely the mean of the groups
-        features = [int_to_features(group) for group in range(self.environment.n_groups)]
+        features = [int_to_features(group) for group in self.groups]
         return [
             [
                 mean([learner.sample_arm(price, feature) for feature in features])

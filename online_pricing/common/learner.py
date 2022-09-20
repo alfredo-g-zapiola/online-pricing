@@ -180,17 +180,18 @@ class CGLearner(Learner):
         :param n_arms: the number of arms
         :param prices: the prices of the arms
         :param context_window: the size of the context window
-        :param features: the number of features
+        :param n_features: the number of features
         """
         super().__init__(n_arms, prices)
         self.n_features = n_features
         self.context_window = context_window
-        self.features_count = [[0] for _ in range(n_features)]
+        self.features_count = np.zeros(shape=[2] * self.n_features, dtype=np.int64)
 
         self.learners = self.initialize_learners()
 
         self.is_split_feature = np.zeros(n_features, dtype=np.int8)
         self.training_data: list[list[RewardsAndFeatures]] = [[] for _ in range(n_arms)]
+        self.pre_split_data: list[list[RewardsAndFeatures]] = [[] for _ in range(n_arms)]
 
     def initialize_learners(self) -> Any:
         """Initialize learners."""
@@ -215,25 +216,49 @@ class CGLearner(Learner):
             arm_pulled, reward, features
         )
 
-        features_matrix = np.zeros(shape=[2] * self.n_features, dtype=np.int8)
-        features_matrix[tuple(features)] = 1
-        sum_by_element(self.features_count, features_matrix.tolist())
-
+        self.features_count[tuple(features)] += 1
         self.training_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
+        self.pre_split_data[arm_pulled].append(RewardsAndFeatures(reward=reward, features=features))
 
     def new_day(self) -> None:
         """New day, see if context split is needed."""
+        features_probability = self.features_count / np.sum(self.features_count)
+        context_rewards = self.get_context_rewards()
+
         self.t += 1
         if self.t % self.context_window == 0:
-            self.generate_context()
+            self.analyze_context(features_probability, context_rewards)
 
-    def generate_context(self) -> None:
+            self.features_count = np.zeros(shape=[2] * self.n_features, dtype=np.int64)
+            self.pre_split_data = [[] for _ in range(self.n_arms)]
+
+    def get_context_rewards(self) -> float:
+        """Get the context rewards."""
+        rewards = np.zeros(shape=[2] * self.n_features)
+        for arm in range(self.n_arms):
+            for reward_and_features in self.pre_split_data[arm]:
+                rewards[tuple(reward_and_features.features)] += reward_and_features.reward
+
+        return rewards.astype(float)
+
+    def analyze_context(self, features_probability: Any, context_rewards: Any) -> None:
         """Make decision to split a feature or not"""
+
         for idx, feature_to_split in enumerate(self.is_split_feature):
-            # TODO: choose how to split
-            if np.random.random() < 0.3 and not feature_to_split:
+            if self.do_we_split(features_probability, context_rewards, feature_to_split) and not feature_to_split:
                 self.is_split_feature[idx] = 1
                 self.train_learners()
+
+    def do_we_split(self, features_probability: Any, context_rewards: Any, feature_to_split: int) -> bool:
+        """Check if we should split a feature."""
+        probability_0 = features_probability[feature_to_split, 0]
+        probability_1 = features_probability[feature_to_split, 1]
+        context_rewards_0 = context_rewards[feature_to_split, 0]
+        context_rewards_1 = context_rewards[feature_to_split, 1]
+
+        context_reward_aggregated = self.get_aggregated_probability(feature_to_split, context_rewards)
+
+        return bool(probability_0 * context_rewards_0 + probability_1 * context_rewards_1 > context_reward_aggregated)
 
     def train_learners(self) -> None:
         """Train new learners on the training data stored."""
@@ -258,6 +283,12 @@ class CGLearner(Learner):
 
     def get_arm(self, price: float) -> int:
         return self.prices.index(price)
+
+    @staticmethod
+    def get_aggregated_probability(feature_to_split: int, context_rewards: Any) -> float:
+        """Get the aggregated probability of a feature."""
+        reward: float = np.mean(np.sum(context_rewards[feature_to_split])) / 2
+        return reward
 
 
 LEARNERS: dict[str, Type[Learner]] = {

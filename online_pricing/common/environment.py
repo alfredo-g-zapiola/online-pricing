@@ -68,7 +68,7 @@ class EnvironmentBase:
 
         # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [70, 50, 20],  # we have more poor people than rich people
+            "n_people_params": [700, 500, 200],  # we have more poor people than rich people
             "dirichlet_params": [  # alpha ratios
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
@@ -271,7 +271,7 @@ class EnvironmentBase:
             for i in range(self.n_products)
         ]
 
-    def yield_expected_alpha(self) -> list[float] | list[list[float]]:
+    def yield_expected_alpha(self) -> list[list[float]]:
         """
         It is assumed the simulator knows the expected values of the alpha ratios.
 
@@ -280,20 +280,20 @@ class EnvironmentBase:
         """
         if not self.context_generation:
             # return the weighted mean (according to the number of people in the group) of the alpha ratios
-            return cast(
-                list[float],
-                sum(
+            return [
+                sum(  # type: ignore [list-item]
                     np.asarray(
                         [
                             self.distributions_parameters["n_people_params"][i]
                             * self.distributions_parameters["dirichlet_params"][i]
                             / self.distributions_parameters["dirichlet_params"][i].sum()
                             for i in range(self.n_groups)
-                        ]
-                    )
+                        ],
+                        dtype=np.float32,
+                    ),
                 )
-                / sum([self.distributions_parameters["n_people_params"][i] for i in range(self.n_groups)]),
-            )
+                / sum([self.distributions_parameters["n_people_params"][i] for i in range(self.n_groups)])
+            ] * self.n_groups
 
         return [alphae / alphae.sum() for alphae in self.distributions_parameters["dirichlet_params"]]
 
@@ -351,7 +351,7 @@ class EnvironmentBase:
         self.uncertain_demand_curve = False  # so we take the mean value
         alpha_context_config = self.context_generation
         self.context_generation = True
-        expected_alpha_r = cast(list[list[float]], self.yield_expected_alpha())
+        expected_alpha_r = self.yield_expected_alpha()
 
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
