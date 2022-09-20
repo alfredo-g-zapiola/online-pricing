@@ -1,10 +1,11 @@
 import warnings
+from typing import Any
 
 import click
 from tqdm import tqdm
 
 from online_pricing.common.environment import EnvironmentBase
-from online_pricing.common.learner import LearnerFactory, MUCBLearner, SWUCBLearner, UCBLearner
+from online_pricing.common.learner import LearnerFactory
 from online_pricing.common.simulator import Simulator
 from online_pricing.helpers.tracer import Tracer
 
@@ -25,7 +26,6 @@ def main(
     step: int | None,
     fully_connected: bool,
     n_days: int,
-    learner: str,
     no_plot: bool,
     n_sims: int,
     sliding_window: bool,
@@ -126,17 +126,17 @@ def main(
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
-                    hyperparameters=base_parameters | {"learner_class": UCBLearner},
+                    hyperparameters=base_parameters | {"learner_class": "MUCB"},
                 ),
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
-                    hyperparameters=base_parameters | {"learner_class": SWUCBLearner},
+                    hyperparameters=base_parameters | {"learner_class": "SWUCB"},
                 ),
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
-                    hyperparameters=base_parameters | {"learner_class": MUCBLearner},
+                    hyperparameters=base_parameters | {"learner_class": "MUCB"},
                 ),
             ]
         case 7:
@@ -165,42 +165,51 @@ def main(
         case _:
             raise ValueError(f"Step {step} does not exists.")
 
-    for environment in environments:
-        learner_args = {"window_size": 10, "w": 10, "beta": 10, "gamma": 10, "context_window": 14, "n_features": 2}
-        learner_factory = LearnerFactory(environment.learner_class, **learner_args)
-
-        tracer = Tracer(n_sims, n_days)
-        run_simulator(n_sims, n_days, environment, tracer, learner_factory)
-        if not no_plot:
-            tracer.plot_day()
-            tracer.plot_total()
-
-    print()
-    print()
-    print(" !==============================! End of Simulation !==============================! ")
-    print()
-    print()
-
-
-def run_simulator(
-    n_samples: int, n_days: int, environment: EnvironmentBase, tracer: Tracer, learner_factory: LearnerFactory
-) -> None:
     try:
-        for n in range(n_samples):
-            simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
-            for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
-                simulator.sim_one_day()
-            tracer.add_daily_data(
-                rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n
-            )
+        for environment in environments:
+            learner_args: dict[str, Any] = {
+                "window_size": 10,
+                "w": 10,
+                "beta": 3,
+                "gamma": 0.5,
+                "context_window": 14,
+                "n_features": 2,
+            }
+            learner_factory = LearnerFactory(environment.learner_class, **learner_args)
 
-            if n != n_samples - 1:
-                tracer.new_day()
+            tracer = Tracer(n_sims, n_days)
+
+            run_simulator(n_sims, n_days, environment, tracer, learner_factory)
+
+            if not no_plot:
+                tracer.plot_day()
+                tracer.plot_total()
 
     except KeyboardInterrupt:
         print()
         print()
         print(" !==============================! Interrupted !==============================! ")
+        return
+
+    finally:
+        print()
+        print()
+        print(" !==============================! End of Simulation !==============================! ")
+        print()
+        print()
+
+
+def run_simulator(
+    n_samples: int, n_days: int, environment: EnvironmentBase, tracer: Tracer, learner_factory: LearnerFactory
+) -> None:
+    for n in range(n_samples):
+        simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
+        for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
+            simulator.sim_one_day()
+        tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n)
+
+        if n != n_samples - 1:
+            tracer.new_day()
 
 
 if __name__ == "__main__":
