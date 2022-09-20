@@ -154,7 +154,6 @@ class MUCBLearner(UCBLearner):
 
     def change_detection(self, observations: list[int]) -> bool:
         if sum(observations[int(np.floor(-self.w / 2)) + 1 :]) - sum(observations[: int(np.floor(self.w / 2))]) > self.beta:
-            print("Change detected at time", self.t)
             return True
 
         return False
