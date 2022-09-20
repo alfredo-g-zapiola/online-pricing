@@ -339,14 +339,8 @@ class EnvironmentBase:
         :return: the best price combination and its clairvoyant
         """
 
-        def price_and_margin(product: int) -> tuple[float, float]:
-            return self.prices_and_margins[self.product_id_map[product]][price_config[product]]
 
-        def c_rate(product: int) -> float:
-            """Compute the conversion rate fixed with fixed group and prices.
-            This is why the function is redefined daily"""
-            return self.sample_demand_curve(group=g, prod_id=product, price=price_and_margin(product)[0],
-                                            n_day=n_day)
+
 
         rewards = {}
         maximum = 0.0
@@ -361,10 +355,22 @@ class EnvironmentBase:
 
         # explore the carthesian product of the possible prices (5 values) with itself 5 times
         for price_config in itertools.product(list(range(self.n_prices)), repeat=self.n_products):
+            print("Price config: ", price_config)
 
             for g in range(self.n_groups):  # for each group
                 quantity = self.distributions_parameters["quantity_demanded_params"][g]
                 influence_function = np.zeros(shape=(self.n_products, self.n_products))
+
+                # margin changes according to today's price config
+                def price_and_margin(product: int) -> tuple[float, float]:
+                    return self.prices_and_margins[self.product_id_map[product]][price_config[product]]
+                # conversion rate changes according to group and selected price (given by price_config)
+                def c_rate(product: int) -> float:
+                    """Compute the conversion rate fixed with fixed group and prices.
+                    This is why the function is redefined daily"""
+                    return self.sample_demand_curve(group=g, prod_id=product,
+                                                    price=price_and_margin(product)[0],
+                                                    n_day=n_day)
 
                 # compute the influence function values for this group at this price
                 for p1 in range(self.n_products):
@@ -425,7 +431,8 @@ class EnvironmentBase:
             if not self.shifting_demand_curve:
                 return 19.08163728705  # with arm (1,1,3,1,1)
             else:
-                computed_clairvoyants = 19.08163728705, 15, 23
+                # best arms: (1,1,3,1,1), (1, 1, 3, 1, 1),
+                computed_clairvoyants = 19.08163728705,{ 19.217445776609587}, 23
                 if n_day <= 15:
                     return computed_clairvoyants[0]
                 elif n_day > 15 and n_day <= 30:

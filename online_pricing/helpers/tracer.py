@@ -45,6 +45,7 @@ class Tracer:
     def new_day(self) -> None:
         self.avg_reward = list[float]()
         self.arm_data = list[list[list[float]]]()
+        self.regret = list[float]()
 
     def plot_day(self) -> None:
         ma = moving_average(self.avg_reward)

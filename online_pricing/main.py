@@ -190,7 +190,7 @@ def run_simulator(
             simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
             for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
                 simulator.sim_one_day()
-            tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, sample=n)
+            tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n)
 
             if n != n_samples - 1:
                 tracer.new_day()
