@@ -3,13 +3,14 @@ from typing import cast
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from scipy import interpolate
 
+plt.rcParams["figure.figsize"] = (15, 10)
+
 
 def moving_average(avg_rewards: list[float] | npt.NDArray[np.float32]) -> list[float]:
-    window = 5
+    window = 4
     average = []
     for idx in range(len(avg_rewards) - window + 1):
         average.append(np.mean(avg_rewards[idx : idx + window]))
@@ -58,14 +59,15 @@ class Tracer:
         ma = moving_average(self.avg_reward)
         plt.figure()
         if any(self.splits):
-            for split in self.splits:
-                plt.axvline(x=split, color="black", linestyle="--")
+            for split in set(self.splits):
+                plt.axvline(x=split, color="black", linestyle="--", label="Split")
         plt.plot(
             self.avg_reward,
             label="Mean Average Reward",
             color="blue",
             linewidth=0.66,
         )
+
         plt.plot(
             self.optimum_total,
             color="black",
@@ -119,7 +121,8 @@ class Tracer:
 
         mean_rewards = self.rewards_mat.mean(axis=0)
         sdev_rewards = self.rewards_mat.std(axis=0)
-        self.plot(mean_rewards, sdev_rewards, "Mean rewards")
+
+        self.plot(mean_rewards, sdev_rewards, "Mean rewards", optimum=True)
 
         # Plot regret
         cum_regret = np.cumsum(self.regrets_mat, axis=1)
@@ -127,7 +130,7 @@ class Tracer:
         sdev_regret = cum_regret.std(axis=0)
         self.plot(mean_regrets, sdev_regret, "Mean cumulative regret")
 
-    def plot(self, data: npt.NDArray[np.float32] | list[float], sdev: float, title: str) -> None:
+    def plot(self, data: npt.NDArray[np.float32] | list[float], sdev: float, title: str, optimum: bool = False) -> None:
         ma = moving_average(data)
 
         plt.figure()
@@ -144,6 +147,13 @@ class Tracer:
             label="Moving Average",
             color="red",
         )
+        if optimum:
+            plt.plot(
+                self.optimum_total,
+                color="black",
+                label="Optimum",
+            )
+
         plt.xlabel("Days")
         plt.ylabel("{}".format(title))
         plt.legend()

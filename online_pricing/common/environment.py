@@ -3,8 +3,6 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-
-# from scipy.stats import wishart # for step 5: uncertain graph weights
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
@@ -17,6 +15,8 @@ from online_pricing.models.user import User
 
 class EnvironmentBase:
     def __init__(self, n_products: int = 5, n_groups: int = 3, hyperparameters: dict[str, Any] | None = None) -> None:
+
+        self._init_r()
 
         if hyperparameters is None:
             hyperparameters = dict()
@@ -34,9 +34,7 @@ class EnvironmentBase:
         self.uncertain_demand_curve = hyperparameters.get("uncertain_demand_curve", False)
         self.uncertain_quantity_bought = hyperparameters.get("uncertain_quantity_bought", False)
         self.uncertain_graph_weights = hyperparameters.get("uncertain_graph_weights", False)
-        self.wishart_df = hyperparameters.get(
-            "wishart_df", 20
-        )  # higher df, less uncertainty. Cannot be lower than n_products
+        self.wishart_df = hyperparameters.get("wishart_df", 20)
         self.shifting_demand_curve = hyperparameters.get("shifting_demand_curve", False)
         self.unknown_demand_curve = hyperparameters.get("unknown_demand_curve", True)
         self.unknown_quantity_bought = hyperparameters.get("unknown_quantity_bought", True)
@@ -66,31 +64,25 @@ class EnvironmentBase:
         self.n_prices = len(self.prices_and_margins[list(self.prices_and_margins.keys())[0]])
         self.product_id_map = {0: "echo_dot", 1: "ring_chime", 2: "ring_f", 3: "ring_v", 4: "echo_show"}
 
-        # function parameters (can also be  opened with a json)
         self.distributions_parameters: dict[str, Any] = {
-            "n_people_params": [300, 450, 700],  # we have more poor people than rich people
-            "dirichlet_params": [  # alpha ratios
+            "n_people_params": [300, 450, 700],
+            "dirichlet_params": [
                 np.asarray([15, 10, 6, 5, 4, 6]),
                 np.asarray([12, 9, 6, 4, 3, 4]),
                 np.asarray([5, 5, 9, 7, 7, 8]),
             ],
-            # for the quantity chosen daily we have a ... distribution
             "quantity_demanded_params": [1, 1.2, 1.8],
-            # product graph probabilities, see the other file
             "product_graph": [
                 self.product_matrix(
                     size=n_products, fully_connected=self.fully_connected, unif_params=(0.2 + g * 0.1, 0.8 + g * 0.1)
                 )
                 for g in range(self.n_groups)
-            ],  # higher the groud id, richer it is, higher edge probas
-            # end of product_graph matrices list
-            # N.B. client graph probabilities are included in the Social Influece class
+            ],
         }
         self.mean_product_graph = list[list[float]]()
         self.influence_functor = InfluenceFunctor(self.yield_first_secondaries(), self._lambda)
 
         # initialise R session
-        self._init_r()
         self.group_proportions = list(range(self.n_groups))
         for g in range(self.n_groups):
             self.group_proportions[g] = self.distributions_parameters["n_people_params"][g] / sum(
@@ -114,13 +106,11 @@ class EnvironmentBase:
     @staticmethod
     @suppress_output
     def _init_r() -> None:
-        """
-        start R and download the roahd package, define the functions of the demand curves
-        :return: void
-        """
+        """Initialise the R session."""
+
         # Install the roahd package
         utils = importr("utils")
-        utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
+        utils.chooseCRANmirror(ind=1)
         utils.install_packages("roahd")
         with open("online_pricing/r/initialise_R.R", "r") as file:
             code = file.read().rstrip()
@@ -128,8 +118,9 @@ class EnvironmentBase:
 
     def sample_n_users(self) -> tuple[int, ...]:
         """
-        Samples from the poisson distribution how many new potential clients of each group arrive on the current day
+        Sample the number of users for each group.
 
+        Samples from the poisson distribution how many new potential clients of each group arrive at the current day
         :return: a list with the number of potential clients of each group
         """
         n_users = tuple(
@@ -141,7 +132,6 @@ class EnvironmentBase:
         """
         Samples the demand curve for a given group, product and price. The day is used when the demand curve is shifting
 
-
         :param group: the id of the group
         :param prod_id: the id of the product
         :param price: the price at which we want to sample
@@ -149,7 +139,6 @@ class EnvironmentBase:
         :return: the probability of buying the product at the given price
         """
 
-        # python 3.10 for match
         match prod_id:
             case 0:
                 prod_name = "echo_dot"
@@ -199,20 +188,15 @@ class EnvironmentBase:
         This function return a dictionary with an entry for each group. For each entry, a list of
         tuples that represent (client_id, primary_product_id).
 
-        :param: uncertain_alpha. False if we take the expected value of the alpha_ratios (mean of
-        dirichlet distribution),
-        True to sample from the dirichlet distribution
-
-        :return: -> Return this { "group_id": [primary_product_id, ...],  }
-             -> primary_product_id in {-1, 0, .., n_products-1}
+        :return:the direct clients for each group
         """
         n_user = self.sample_n_users()
         if self.uncertain_alpha:
             dirichlet_sample = [
                 np.random.dirichlet(self.distributions_parameters["dirichlet_params"][g]) for g in range(self.n_groups)
             ]
-        else:  # compute expected value
-            # we just take each element of the vector and divide it by the sum to get the expected value
+        else:
+
             dirichlet_sample = [
                 self.distributions_parameters["dirichlet_params"][g]
                 / self.distributions_parameters["dirichlet_params"][g].sum()
@@ -231,7 +215,7 @@ class EnvironmentBase:
                         p=dirichlet_sample[group][1:] / dirichlet_sample[group][1:].sum(),
                     ),
                 )
-                for idx in range(n_direct_clients[group])
+                for _ in range(n_direct_clients[group])
             ]
             for group in range(self.n_groups)
         ]
@@ -257,7 +241,6 @@ class EnvironmentBase:
 
         :return: A list of n_products where for each product we have the two secondaries
         """
-        # first we have a weighed mean of the means of the product graphs
         weighted_mean_p_graph: npt.NDArray[np.float32] = np.zeros((self.n_products, self.n_products), dtype=np.float32)
         for g in range(self.n_groups):
             weighted_mean_p_graph += (
@@ -341,7 +324,6 @@ class EnvironmentBase:
 
         rewards = {}
         maximum = 0.0
-        cur_reward = 0.0
         max_arm = ""
 
         save_shift = self.shifting_demand_curve
@@ -423,12 +405,12 @@ class EnvironmentBase:
         :return:
         """
         if self.context_generation:
-            computed_groups_clairvoyants = (1.416529356393042, 28.51848511013725, 203.3977217166584)
+            computed_groups_clairvoyants = (2.833058712786084, 57.0369702202745, 298.7954434333168)
 
             return sum(computed_groups_clairvoyants[g] * self.group_proportions[g] for g in range(self.n_groups))
         else:
             # best arms: (2, 1, 3, 1, 2), (2, 2, 3, 1, 2),(2, 2, 3, 1, 2)
-            computed_clairvoyants = (38.88575186024893, 69.22598107253785, 16.13083207278911)
+            computed_clairvoyants = (143.95453453, 287.49863215086856, 85.87646858816036)
             # computed_clairvoyants = (8.993181445527823, 13.29717560887341, 16.13083207278911)
             if not self.shifting_demand_curve:
                 return computed_clairvoyants[0]  # with arm (1,1,3,1,1)
@@ -436,7 +418,7 @@ class EnvironmentBase:
 
                 if n_day <= 15:
                     return computed_clairvoyants[0]
-                elif n_day > 15 and n_day <= 30:
+                elif 15 < n_day <= 30:
                     return computed_clairvoyants[1]
                 else:
                     return computed_clairvoyants[2]
@@ -462,5 +444,5 @@ class EnvironmentBase:
                     price_id += 1
             self.expected_demand_curve.append(current.astype(float).tolist())
 
-        self.uncertain_demand_curve = save  # ripristinarlo
+        self.uncertain_demand_curve = save
         self.shifting_demand_curve = save_2

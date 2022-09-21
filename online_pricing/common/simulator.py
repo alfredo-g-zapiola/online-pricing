@@ -5,10 +5,10 @@ from typing import Any, Deque
 
 from online_pricing.common.environment import EnvironmentBase
 from online_pricing.common.influence_function import InfluenceFunctor
-from online_pricing.common.learner import Learner, LearnerFactory, TSLearner
+from online_pricing.common.learner import Learner, LearnerFactory
 from online_pricing.common.social_influence import SocialInfluence
 from online_pricing.helpers.tracer import Tracer
-from online_pricing.helpers.utils import int_to_features, mean, print_matrix, sum_by_element
+from online_pricing.helpers.utils import int_to_features, mean, sum_by_element
 from online_pricing.models.user import User
 
 
@@ -28,6 +28,7 @@ class Simulator(object):
         self.environment = environment
         self.secondaries = self.environment.yield_first_secondaries()
         self.expected_alpha_r = self.environment.yield_expected_alpha()  # set to True in step 7
+
         # lambda to go to second secondary products
         self._lambda = self.environment.get_lambda()
 
@@ -52,10 +53,10 @@ class Simulator(object):
         self.social_influence = SocialInfluence(
             self.environment.n_products, secondaries=self.secondaries, lambda_param=self._lambda
         )
-        # estimate the matrix A (present in environment but not known)
-        # this is later updated, initialisation not required
-        self.estimated_edge_probas: list[list[float]]
-        self.quantity_learners = [[0, 1]]
+
+        # Additional attributes
+        self.estimated_edge_probas = list[list[float]]()
+        self.quantity_learners = [0, 1]
         self.n_labeled_groups = 1
 
         self.influence_functor = InfluenceFunctor(secondaries=self.secondaries, _lambda=self._lambda)
@@ -67,8 +68,8 @@ class Simulator(object):
         Simulate what happens in one day.
 
         This function simulates what would happen in a real world scenario.
-        Clients interact with a primary product. Each client belongs to a group which has
-        different probability distributions - meaning behaviours - that determines the outcome of a
+        Clients interact with a primary product. Each client belonging to a group which has
+        different probability distributions - behaviours - that determines the outcome of a
         visit. After each client interaction, the current learner (belonging to the current
         configuration of prices) is updated. Then, the cumulative sold products array is updated
         along with the empirical influence matrix that records the jumps to secondary products.
@@ -99,23 +100,26 @@ class Simulator(object):
         mean_reward_per_client = self.get_reward(n_user=n_users, products_sold=products_sold, margins=current_margins)
         learner_data = self.get_learner_data()
 
+        # Tracer data
         self.tracer.add_avg_reward(mean_reward_per_client)
         self.tracer.add_arm_data(learner_data)
         self.tracer.add_regret(float(self.environment.yield_clairvoyant(self.n_day) - mean_reward_per_client))
         self.tracer.add_optimum_total(self.environment.yield_clairvoyant(self.n_day))
 
+        # Next day configuration
         next_day_configuration = self.greedy_algorithm()
         self.current_prices = [
             [self.prices[idx][price_id] for idx, price_id in enumerate(next_day_configuration[group])]
             for group in self.groups
         ]
 
+        # Additional work
         did_split = 0
         if self.environment.context_generation:
             for learner in self.learners:
                 did_split += learner.new_day() or 0
 
-            if did_split > len(self.learners):
+            if did_split > len(self.learners) / 2:
                 self.tracer.add_split(self.n_day)
 
         self.n_day += 1
@@ -139,8 +143,8 @@ class Simulator(object):
         n_units = 0
         if random.random() <= buy_probability:
             n_units = int(ceil(self.environment.sample_quantity_bought(group)))
-            self.quantity_learners[0][0] = +n_units
-            self.quantity_learners[0][0] += 1
+            self.quantity_learners[0] = +n_units + 1
+            self.quantity_learners[1] += 1
 
         return n_units
 
@@ -222,42 +226,55 @@ class Simulator(object):
             self.learners[idx].update(arms_pulled[idx], bought, features)
 
     def conversion_rate(self, product_id: int, prices: list[float], features: list[int] | None = None) -> float:
+        """
+        Compute the conversion rate of a product.
+
+        :param product_id: product id
+        :param prices: prices of the products
+        :param features: features of the user
+        :return: conversion rate
+
+        """
         if self.environment.unknown_demand_curve:
             return self.learners[product_id].sample_arm(self.learners[product_id].get_arm(prices[product_id]), features)
-        else:
-            # price_id = self.prices[product_id].index(prices[product_id])
-            # print("Price id is: ", price_id)
-            # print("Product id: ", product_id)
-            price_id = self.learners[product_id].get_arm(prices[product_id])
-            if self.environment.shifting_demand_curve:
-                if self.n_day <= 15:
-                    return self.environment.expected_demand_curve[0][product_id][price_id]
-                elif self.n_day > 15 and self.n_day <= 30:
-                    return self.environment.expected_demand_curve[1][product_id][price_id]
-                else:
-                    return self.environment.expected_demand_curve[2][product_id][price_id]
 
-            else:  # just take the original one
+        price_id = self.learners[product_id].get_arm(prices[product_id])
+        if self.environment.shifting_demand_curve:
+            if self.n_day <= 15:
                 return self.environment.expected_demand_curve[0][product_id][price_id]
+            elif 15 < self.n_day <= 30:
+                return self.environment.expected_demand_curve[1][product_id][price_id]
+            else:
+                return self.environment.expected_demand_curve[2][product_id][price_id]
 
-    def influence_function(self, i: int, j: int, prices: list[float], features: list[int]) -> float:
+        return self.environment.expected_demand_curve[0][product_id][price_id]
+
+    def influence_function(
+        self, primary_product: int, secondary_product: int, prices: list[float], features: list[int]
+    ) -> float:
         """
-        Sums the probability of clicking product j given product i was bought (all possible paths, doing one to 4 jumps)
-        :return:
+        Compute the influence function of a product.
+
+        :param primary_product: primary product id
+        :param secondary_product: secondary product id
+        :param prices: prices of the products
+        :param features: features of the user
+        :return: influence function value
         """
 
         def c_rate(prod_id: int) -> float:
+            """Helper callable to compute the conversion rate of a product."""
             return self.conversion_rate(prod_id, prices=prices, features=features)
 
         if self.environment.unknown_product_weights:
-            return self.influence_functor(i, j, c_rate, self.estimated_edge_probas)
+            return self.influence_functor(primary_product, secondary_product, c_rate, self.estimated_edge_probas)
 
-        else:  # we do not use the estiamted edge probas
-            return self.influence_functor(i, j, c_rate, self.environment.mean_product_graph)
+        return self.influence_functor(primary_product, secondary_product, c_rate, self.environment.mean_product_graph)
 
     def mean_quantity_bought(self) -> float:
+        """Compute the mean quantity bought by the users."""
         if self.environment.unknown_quantity_bought:
-            return self.quantity_learners[0][0] / self.quantity_learners[0][1]
+            return self.quantity_learners[0] / self.quantity_learners[1]
         else:
             return sum(
                 [
@@ -305,19 +322,29 @@ class Simulator(object):
                         alpha_ratios[group],
                         group,
                     )
-
                     # If objective value is higher, update the configuration
                     if new_target > current_target:
                         best_configuration = new_configuration
                         current_target = new_target
                         has_changed = True
+
             best_configurations.append(best_configuration)
 
+        # If groups are aggregated, we return the same configuration for all groups
         if not self.environment.context_generation:
             return [best_configurations[0] for _ in self.groups]
+
         return best_configurations
 
     def objective_function(self, prices: list[float], alpha_ratios: list[float], group: int | None = None) -> float:
+        """
+        Compute the objective function value for a given configuration of prices.
+
+        :param prices: prices of the products
+        :param alpha_ratios: alpha ratios of the products
+        :param group: group of the user
+        :return: objective function value
+        """
         if group is None:
             group = 0
 
@@ -338,7 +365,6 @@ class Simulator(object):
 
             conversion_rates = [c_rate(product_id) for product_id in range(self.environment.n_products)]
 
-        mean_quantity = self.environment.distributions_parameters["quantity_demanded_params"][group]
         return sum(
             [
                 alpha_ratios[product_id + 1]
@@ -382,7 +408,7 @@ class Simulator(object):
 
     def get_learner_data(self) -> list[list[float]]:
         """
-        Get the data of the learners.
+        Get the data from the instance learners.
 
         :return: list of list of data.
         """

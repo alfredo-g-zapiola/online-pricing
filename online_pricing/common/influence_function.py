@@ -6,7 +6,7 @@ class InfluenceFunctor:
     def __init__(self, secondaries: list[list[int]], _lambda: float) -> None:
         self.secondaries = secondaries
         self._lambda = _lambda
-        self.feasible_paths = [[] for _ in range(len(self.secondaries))]
+        self.feasible_paths: list[list[list[list[int]]]] = [[] for _ in range(len(self.secondaries))]
         self.compute_feasible_paths()
 
     def compute_feasible_paths(self) -> None:

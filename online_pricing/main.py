@@ -21,15 +21,6 @@ warnings.filterwarnings("ignore")
 @click.option("--no-plot", "-p", is_flag=True, help="Whether to avoid plotting the results.")
 @click.option("--n-sims", "-ns", default=30, help="How many simulations we carry out")
 @click.option("--sliding-window", "-sw", default=False, help="In step 6, whether to use UCB learners with sliding window")
-@click.option(
-    "--unknown-params", "-ukp", default=True, help="Whether some paramateres (depending on step) need to be estimated"
-)
-@click.option(
-    "--uncertain-params",
-    "-unp",
-    default=False,
-    help="Whether some params are uncertain (depending on step), i.e. we sample from " "them every day",
-)
 def main(
     step: int | None,
     fully_connected: bool,
@@ -37,12 +28,11 @@ def main(
     no_plot: bool,
     n_sims: int,
     sliding_window: bool,
-    unknown_params: bool,
-    uncertain_params: bool,
 ) -> None:
     if step is None:
         step = int(input("Step to be run: "))
 
+    print()
     print()
     print()
     print(" !==============================! Simulation Starting !==============================! ")
@@ -57,13 +47,13 @@ def main(
                     n_groups=3,
                     hyperparameters={
                         "fully_connected": fully_connected,
-                        "learner_class": "TS",
+                        "learner_class": "UCB",
                         "context_generation": False,
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": unknown_params,
-                        "unknown_demand_curve": uncertain_params,
+                        "uncertain_demand_curve": False,
+                        "unknown_demand_curve": True,
                         "uncertain_quantity_bought": False,
                         "unknown_quantity_bought": False,
                         "uncertain_product_weights": False,
@@ -81,13 +71,13 @@ def main(
                         "fully_connected": fully_connected,
                         "learner_class": "TS",
                         "context_generation": False,
-                        "uncertain_alpha": uncertain_params,
+                        "uncertain_alpha": True,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": uncertain_params,
-                        "unknown_demand_curve": unknown_params,
-                        "uncertain_quantity_bought": uncertain_params,
-                        "unknown_quantity_bought": unknown_params,
+                        "uncertain_demand_curve": False,
+                        "unknown_demand_curve": True,
+                        "uncertain_quantity_bought": False,
+                        "unknown_quantity_bought": True,
                         "uncertain_product_weights": False,
                         "unknown_product_weights": False,
                     },
@@ -102,15 +92,15 @@ def main(
                         "fully_connected": fully_connected,
                         "learner_class": "TS",
                         "context_generation": False,
-                        "uncertain_alpha": uncertain_params,
+                        "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": uncertain_params,
-                        "unknown_demand_curve": unknown_params,
-                        "uncertain_quantity_bought": uncertain_params,
-                        "unknown_quantity_bought": unknown_params,
-                        "uncertain_product_weights": uncertain_params,
-                        "unknown_product_weights": unknown_params,
+                        "uncertain_demand_curve": False,
+                        "unknown_demand_curve": False,
+                        "uncertain_quantity_bought": False,
+                        "unknown_quantity_bought": False,
+                        "uncertain_product_weights": True,
+                        "unknown_product_weights": True,
                     },
                 ),
             ]
@@ -122,7 +112,7 @@ def main(
                 "uncertain_alpha": False,
                 "group_unknown": True,
                 "lambda": 0.5,
-                "uncertain_demand_curve": uncertain_params,
+                "uncertain_demand_curve": False,
                 "unknown_demand_curve": True,
                 "uncertain_quantity_bought": False,
                 "unknown_quantity_bought": False,
@@ -133,11 +123,6 @@ def main(
             }
 
             environments = [
-                EnvironmentBase(
-                    n_products=5,
-                    n_groups=3,
-                    hyperparameters=base_parameters | {"learner_class": "MUCB"},
-                ),
                 EnvironmentBase(
                     n_products=5,
                     n_groups=3,
@@ -161,7 +146,7 @@ def main(
                         "uncertain_alpha": False,
                         "group_unknown": True,
                         "lambda": 0.5,
-                        "uncertain_demand_curve": uncertain_params,
+                        "uncertain_demand_curve": False,
                         "unknown_demand_curve": True,
                         "uncertain_quantity_bought": False,
                         "unknown_quantity_bought": False,
@@ -175,10 +160,11 @@ def main(
         case _:
             raise ValueError(f"Step {step} does not exists.")
 
+    tracer = None
     try:
         for environment in environments:
             learner_args: dict[str, Any] = {
-                "window_size": 10,
+                "window_size": 20,
                 "w": 10,
                 "beta": 3,
                 "gamma": 0.5,
@@ -191,10 +177,8 @@ def main(
 
             run_simulator(n_sims, n_days, environment, tracer, learner_factory)
 
-            if not no_plot:
-                no_plot = True
-                tracer.plot_day()
-                tracer.plot_total()
+            tracer.plot_day()
+            tracer.plot_total()
 
     except KeyboardInterrupt:
         print()
@@ -209,7 +193,7 @@ def main(
         print()
         print()
 
-        if not no_plot:
+        if not no_plot and tracer is not None:
             tracer.plot_day()
             tracer.plot_total()
 
@@ -221,7 +205,7 @@ def run_simulator(
         simulator = Simulator(environment, int(n * 4314), tracer, learner_factory)
         for _ in tqdm(range(n_days), desc=f"Simulating realization {n + 1}"):
             simulator.sim_one_day()
-        tracer.add_daily_data(rewards=simulator.reward_tracer.avg_reward, regrets=simulator.reward_tracer.regret, sample=n)
+        tracer.add_daily_data(rewards=simulator.tracer.avg_reward, regrets=simulator.tracer.regret, sample=n)
 
         if n != n_samples - 1:
             tracer.new_day()

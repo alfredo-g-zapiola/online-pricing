@@ -1,8 +1,8 @@
-import time
 from abc import ABC, abstractmethod
 from typing import Any, Type, cast
 
 import numpy as np
+import numpy.typing as npt
 
 from online_pricing.models.rewards_and_features import RewardsAndFeatures
 
@@ -39,8 +39,9 @@ class Learner(ABC):
     def mean_arm(self, arm_id: int) -> float:
         pass
 
-    def new_day(self) -> None:
+    def new_day(self) -> int | None:
         self.t += 1
+        return None
 
 
 class UCBLearner(Learner):
@@ -195,7 +196,7 @@ class CGLearner(Learner):
 
     def initialize_learners(self) -> Any:
         """Initialize learners."""
-        learners = np.ndarray(shape=[2] * self.n_features, dtype=TSLearner)
+        learners: npt.NDArray[Any] = np.ndarray(shape=[2] * self.n_features, dtype=TSLearner)
         initialize_learners = learners.flatten()
         for idx in range(len(initialize_learners)):
             initialize_learners[idx] = TSLearner(self.n_arms, self.prices)
@@ -236,6 +237,8 @@ class CGLearner(Learner):
             if splitted:
                 return splitted
 
+        return None
+
     def get_context_rewards(self) -> list[float]:
         """Get the context rewards."""
         rewards = np.zeros(shape=(2, self.n_features))
@@ -254,6 +257,8 @@ class CGLearner(Learner):
                 self.is_split_feature[idx] = 1
                 self.train_learners()
                 return True
+
+        return None
 
     def do_we_split(self, features_probability: Any, context_rewards: Any, feature_to_split: int) -> bool:
         """Check if we should split a feature."""
